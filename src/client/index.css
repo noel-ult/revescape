@@ -2,6 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
+.scout-mode { display: flex; flex-direction: column; gap: 6px; font-size: 11px; color: #8da3b6; }
+.scout-mode select { max-width: 100%; min-height: 42px; padding: 8px 12px; border: 1px solid #24394e; border-radius: 8px; background: #0e1b2a; color: #ecf5f8; font: inherit; }
+.scout-mode select:focus-visible { outline: 2px solid #9ef6d8; outline-offset: 3px; }
+
 @layer base {
   body {
     background-color: #040711;

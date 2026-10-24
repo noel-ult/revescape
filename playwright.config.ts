@@ -25,7 +25,7 @@ export default defineConfig({
   webServer: {
     command: 'npm run start',
     url: `http://localhost:${port}/api/health`,
-    env: { PORT: port, NODE_ENV: 'production' },
+    env: { PORT: port, NODE_ENV: 'production', LUNA_ENABLED: 'false', OPENAI_API_KEY: '' },
     reuseExistingServer: !process.env.CI,
     timeout: 30000,
   },

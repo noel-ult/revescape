@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { cloneGrid, computeGridStats, createEmptyGrid } from '../shared/board';
-import { Grid, MatchState, PlayerSlot } from '../shared/types';
+import { Grid, MatchState, PlayerSlot, ValidationResult } from '../shared/types';
 import { validateBoard } from '../shared/validator';
+import { runAutonomousAgentAsync } from '../shared/agent';
 import { SHOWCASE_FACILITY } from '../shared/facility';
 import { SectorMap } from './components/SectorMap';
 import { RaceScreen } from './components/RaceScreen';
@@ -46,7 +47,15 @@ export const App: React.FC = () => {
   // Solo Mode State
   const [soloGrid, setSoloGrid] = useState<Grid>(() => createEmptyGrid());
   const [soloPlayerSlot, setSoloPlayerSlot] = useState<PlayerSlot | null>(null);
+  const [scoutMode, setScoutMode] = useState<'DETERMINISTIC' | 'LUNA'>('DETERMINISTIC');
+  const [soloPending, setSoloPending] = useState(false);
+  const scoutRequest = useRef<AbortController | null>(null);
   const [pvpReplayArena, setPvpReplayArena] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (view !== 'SOLO_BUILD') scoutRequest.current?.abort();
+    return () => scoutRequest.current?.abort();
+  }, [view]);
 
   useEffect(() => {
     const socket = getSocket();
@@ -175,6 +184,7 @@ export const App: React.FC = () => {
   };
 
   const handleLeaveToHome = () => {
+    scoutRequest.current?.abort();
     getSocket().emit('lobby:leave');
     saveRoomCode('');
     setMatchState(null);
@@ -192,10 +202,39 @@ export const App: React.FC = () => {
     setView('SOLO_BUILD');
   };
 
-  const handleSoloSubmit = (submittedGrid: Grid) => {
-    const validation = validateBoard(submittedGrid);
+  const handleSoloSubmit = async (submittedGrid: Grid) => {
+    if (scoutRequest.current) return;
+    let validation = validateBoard(submittedGrid);
     if (!validation.valid || !validation.solverResult || !validation.scoreBreakdown) {
       return;
+    }
+    if (scoutMode === 'LUNA') {
+      const controller = new AbortController();
+      scoutRequest.current = controller;
+      setSoloPending(true);
+      try {
+        const response = await fetch('/api/scout', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ grid: submittedGrid }),
+          signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15_000)]),
+        });
+        if (!response.ok) throw new Error('Scout unavailable');
+        const result = await response.json() as ValidationResult;
+        if (!result.valid || !result.agentResult || !result.solverResult || !result.scoreBreakdown) throw new Error('Incomplete scout result');
+        validation = result;
+      } catch {
+        if (controller.signal.aborted) return;
+        // Run the shared engine locally so fallback counts/events reflect actual decisions.
+        const fallback = async () => ({ source: 'fallback' as const, reason: 'Luna service unavailable' });
+        validation.agentResult = await runAutonomousAgentAsync(submittedGrid, fallback);
+        validation.adaptedAgentResult = await runAutonomousAgentAsync(submittedGrid, fallback, {
+          priorMemory: validation.agentResult.updatedMemory,
+        });
+      } finally {
+        scoutRequest.current = null;
+        setSoloPending(false);
+      }
+      if (controller.signal.aborted) return;
     }
     const stats = computeGridStats(submittedGrid);
     const slot: PlayerSlot = {
@@ -297,6 +336,10 @@ export const App: React.FC = () => {
           initialGrid={soloGrid}
           onSubmitRoom={handleSoloSubmit}
           onExit={handleLeaveToHome}
+          scoutMode={scoutMode}
+          onScoutModeChange={setScoutMode}
+          isLaunching={soloPending}
+          isSubmitted={soloPending}
         />
       );
     }

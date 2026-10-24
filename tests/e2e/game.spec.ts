@@ -30,6 +30,32 @@ async function clickOrbitalPlatform(page: import('@playwright/test').Page, index
 }
 
 test.describe('Reverse Escape — Humans vs AI E2E Verification', () => {
+  test('Solo Luna selection shows a real server fallback when no model is configured', async ({ page }) => {
+    await page.goto('/');
+    await page.getByTestId('solo-challenge-btn').click();
+    await page.getByRole('combobox', { name: 'Expedition scout' }).selectOption('LUNA');
+    const response = page.waitForResponse(response => response.url().endsWith('/api/scout') && response.status() === 200);
+    await page.getByTestId('submit-room-btn').click();
+    const result = await (await response).json();
+    expect(result.agentResult.escaped).toBe(true);
+    expect(result.agentResult.planner.modelChoices).toBe(0);
+    await expect(page.getByTestId('arena-heading')).toBeVisible();
+    await expect(page.getByTestId('luna-status')).toContainText('0 Luna choices');
+    await expect(page.getByText('LUNA REQUESTED / FALLBACK')).toBeVisible();
+  });
+
+  test('Solo Luna remains playable if the model service cannot be reached', async ({ page }) => {
+    await page.route('**/api/scout', route => route.abort());
+    await page.goto('/');
+    await page.getByTestId('solo-challenge-btn').click();
+    await page.getByRole('combobox', { name: 'Expedition scout' }).selectOption('LUNA');
+    await page.getByTestId('submit-room-btn').click();
+    await expect(page.getByTestId('arena-heading')).toBeVisible();
+    await expect(page.getByTestId('luna-status')).toContainText('0 Luna choices');
+    await expect(page.getByTestId('luna-status')).not.toContainText('· 0 fallback choices');
+    await expect(page.getByText('LUNA REQUESTED / FALLBACK')).toBeVisible();
+  });
+
   test('3D studio: place a module, undo, restore, and follow a moving scout', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', error => errors.push(error.message));

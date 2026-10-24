@@ -123,6 +123,8 @@ export interface AgentDecisionEvent {
     | 'LEVEL_CHANGE'
     | 'EMP_JAMMED'
     | 'REPLAN'
+    | 'LUNA_CHOICE'
+    | 'PLANNER_FALLBACK'
     | 'MEMORY_ADAPT'
     | 'EXIT_FOUND'
     | 'ESCAPED';
@@ -161,6 +163,12 @@ export interface AgentSimulationStep {
 }
 
 export interface AutonomousAgentResult {
+  planner?: {
+    mode: 'LUNA';
+    model: 'gpt-6-luna';
+    modelChoices: number;
+    fallbackChoices: number;
+  };
   escaped: boolean;
   attemptNumber: number;
   visibilityRadius: number;

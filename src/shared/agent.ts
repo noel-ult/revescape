@@ -167,14 +167,43 @@ export function planRouteAStar(
  * - Component 5: Dynamic Replanning (invalidates plan on newly revealed obstacles, traps, or decoys)
  * - Component 6: Real Observable Decision Log events
  */
-export function runAutonomousAgent(
+export interface AgentOptions {
+  visibilityRadius?: number;
+  priorMemory?: AgentMemory;
+  maxSteps?: number;
+}
+
+/** Only observed beliefs and public architecture leave the simulation. Never the true grid. */
+export interface ObjectiveSnapshot {
+  stepIndex: number;
+  position: Coordinate;
+  keyMask: number;
+  switchMask: number;
+  empRemainingTurns: number;
+  topology: DeckTopology;
+  knownCells: Array<{ row: number; col: number; tile: TileType; visits: number }>;
+  knownHazards: string[];
+  disarmedHazards: string[];
+  verifiedDecoys: string[];
+  signals: Coordinate[];
+  candidates: Array<{ id: string; type: AgentObjectiveType; target: Coordinate; score: number; moves: number }>;
+}
+
+export interface ObjectiveSelection {
+  candidateId?: string;
+  source: 'luna' | 'fallback';
+  reason?: string;
+}
+
+export type ObjectivePolicy = (snapshot: ObjectiveSnapshot) => Promise<ObjectiveSelection>;
+
+// One simulation engine drives both the synchronous baseline and asynchronous Luna strategy.
+function* simulateAgent(
   trueGrid: Grid,
-  options?: {
-    visibilityRadius?: number;
-    priorMemory?: AgentMemory;
-    maxSteps?: number;
-  }
-): AutonomousAgentResult {
+  options?: AgentOptions,
+  externalPolicy = false
+): Generator<ObjectiveSnapshot, AutonomousAgentResult, ObjectiveSelection | undefined> {
+  const planner = { mode: 'LUNA' as const, model: 'gpt-6-luna' as const, modelChoices: 0, fallbackChoices: 0 };
   const startTime = performance.now();
   const visibilityRadius = options?.visibilityRadius ?? DEFAULT_VISION_RADIUS;
   const maxSteps = options?.maxSteps ?? MAX_AGENT_STEPS;
@@ -341,14 +370,14 @@ export function runAutonomousAgent(
   /**
    * Component 2: Select next planning objective and compute A* route
    */
-  const selectNextObjectiveAndPlan = (
+  const selectNextObjectiveAndPlan = function* (
     stepIndex: number
-  ): {
+  ): Generator<ObjectiveSnapshot, {
     objectiveType: AgentObjectiveType;
     target: Coordinate | null;
     route: Coordinate[];
     explanation: string;
-  } => {
+  }, ObjectiveSelection | undefined> {
     const candidates: Array<{
       type: AgentObjectiveType;
       target: Coordinate;
@@ -540,7 +569,38 @@ export function runAutonomousAgent(
     }
 
     candidates.sort((a, b) => b.score - a.score);
-    const chosen = candidates[0];
+    let chosen = candidates[0];
+    let selectionNote = '';
+    if (externalPolicy && candidates.length > 1) {
+      // At most 64 cells x a few objective types; cap the supplied choice set explicitly.
+      const choices = candidates.slice(0, 128);
+      const selection = yield {
+        stepIndex,
+        position: { ...currentPos }, keyMask, switchMask, empRemainingTurns,
+        topology: structuredClone(topology),
+        knownCells: Array.from(knownMap, ([key, tile]) => {
+          const [row, col] = key.split(',').map(Number);
+          return { row, col, tile, visits: visitCounts.get(key) ?? 0 };
+        }),
+        knownHazards: [...knownHazards], disarmedHazards: [...disarmedHazards], verifiedDecoys: [...verifiedDecoys],
+        signals: Array.from(candidateSignals.values(), pos => ({ ...pos })),
+        candidates: choices.map((candidate, index) => ({
+          id: String(index), type: candidate.type, target: { ...candidate.target },
+          score: candidate.score, moves: candidate.route.length,
+        })),
+      };
+      const index = choices.findIndex((_, i) => String(i) === selection?.candidateId);
+      if (selection?.source === 'luna' && index >= 0) {
+        chosen = choices[index];
+        planner.modelChoices++;
+        selectionNote = 'Luna selected this objective; A* planned the legal route. ';
+        recordDecision(stepIndex, 'LUNA_CHOICE', `${selectionNote}${chosen.explanation}`);
+      } else {
+        planner.fallbackChoices++;
+        selectionNote = `Deterministic fallback (${selection?.reason ?? 'invalid model choice'}). `;
+        recordDecision(stepIndex, 'PLANNER_FALLBACK', selectionNote + chosen.explanation);
+      }
+    }
 
     if (chosen.avoidsHazard || anyCandidateAvoidedHazard) {
       for (const hKey of knownHazards) {
@@ -561,7 +621,7 @@ export function runAutonomousAgent(
       objectiveType: chosen.type,
       target: chosen.target,
       route: chosen.route,
-      explanation: chosen.explanation,
+      explanation: selectionNote + chosen.explanation,
     };
   };
 
@@ -577,7 +637,7 @@ export function runAutonomousAgent(
   const initObs = observeEnvironment(0);
   visitCounts.set(coordKey(currentPos.row, currentPos.col), 1);
 
-  let currentPlan = selectNextObjectiveAndPlan(0);
+  let currentPlan = (yield* selectNextObjectiveAndPlan(0));
   recordDecision(0, 'FRONTIER', currentPlan.explanation, currentPos);
 
   steps.push({
@@ -617,7 +677,7 @@ export function runAutonomousAgent(
         switchMask
       )
     ) {
-      currentPlan = selectNextObjectiveAndPlan(stepIdx);
+      currentPlan = (yield* selectNextObjectiveAndPlan(stepIdx));
       if (currentPlan.route.length === 0) {
         break;
       }
@@ -634,7 +694,7 @@ export function runAutonomousAgent(
       !canTraverseDeck(topology, currentPos, nextCoord)) {
       knownMap.set(nextKey, trueTile);
       replanCount++;
-      currentPlan = selectNextObjectiveAndPlan(stepIdx);
+      currentPlan = (yield* selectNextObjectiveAndPlan(stepIdx));
       recordDecision(
         stepIdx,
         'REPLAN',
@@ -755,7 +815,7 @@ export function runAutonomousAgent(
       if (obs.newlyRevealedImportant || stepEvent === 'TRAP_RESET_TRIGGERED') {
         replanCount++;
       }
-      currentPlan = selectNextObjectiveAndPlan(stepIdx);
+      currentPlan = (yield* selectNextObjectiveAndPlan(stepIdx));
     }
 
     steps.push({
@@ -783,6 +843,7 @@ export function runAutonomousAgent(
     if (stepEvent === 'EXIT') {
       const solveTimeMs = Number((performance.now() - startTime).toFixed(3));
       return {
+        planner: externalPolicy ? planner : undefined,
         escaped: true,
         attemptNumber,
         visibilityRadius,
@@ -813,6 +874,7 @@ export function runAutonomousAgent(
 
   const solveTimeMs = Number((performance.now() - startTime).toFixed(3));
   return {
+    planner: externalPolicy ? planner : undefined,
     escaped: false,
     attemptNumber,
     visibilityRadius,
@@ -839,4 +901,27 @@ export function runAutonomousAgent(
     },
     reason: 'Autonomous agent reached maximum exploration step limit.',
   };
+}
+
+/** Original deterministic planner: no network and unchanged objective scoring. */
+export function runAutonomousAgent(trueGrid: Grid, options?: AgentOptions): AutonomousAgentResult {
+  const simulation = simulateAgent(trueGrid, options);
+  const result = simulation.next();
+  if (!result.done) throw new Error('Baseline planner unexpectedly requested an external decision.');
+  return result.value;
+}
+
+/** External policy chooses only from already reachable targets; A* and world rules stay authoritative. */
+export async function runAutonomousAgentAsync(
+  trueGrid: Grid, policy: ObjectivePolicy, options?: AgentOptions
+): Promise<AutonomousAgentResult> {
+  const simulation = simulateAgent(trueGrid, options, true);
+  let result = simulation.next();
+  while (!result.done) {
+    let selection: ObjectiveSelection;
+    try { selection = await policy(result.value); }
+    catch { selection = { source: 'fallback', reason: 'decision unavailable' }; }
+    result = simulation.next(selection);
+  }
+  return result.value;
 }

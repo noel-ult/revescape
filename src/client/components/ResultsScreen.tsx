@@ -358,7 +358,8 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({
       <div className="mt-6 p-4 rounded-xl bg-slate-900/70 border border-slate-800 flex items-center gap-3 text-xs font-mono text-slate-400">
         <Sparkles className="w-4 h-4 text-cyan-400 shrink-0" />
         <span>
-          <strong>Mind Wars Fair Evaluation:</strong> Both rooms are evaluated against an identical Autonomous Planning Agent (Vision Radius 2, Frontier Exploration + A* + Memory) and verified solvable by an exhaustive state-space BFS validator.
+          {mode === 'PVP' ? <><strong>Mind Wars Fair Evaluation:</strong> Both rooms use the same deterministic frontier + A* scout, memory rules, and vision radius 2. Full-map BFS verifies solvability.</>
+            : <><strong>Solo evaluation:</strong> Full-map BFS validates the room. The replay identifies the selected scout and any Luna fallbacks. Luna-assisted scores are sandbox results and do not affect multiplayer scoring.</>}
         </span>
       </div>
     </div>

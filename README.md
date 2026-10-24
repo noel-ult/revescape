@@ -2,7 +2,7 @@
 > **"You Build the Trap. The AI Finds a Way."**
 > Built for **Devin Hacks Kochi 2026** | Theme: **Make Room for Play**
 
-**Reverse Escape: Mind Wars** is a real-time multiplayer strategy game where two human architects engineer deceptive 8×8 escape rooms under an identical 30-point budget and challenge a **deterministic planning agent** operating under partial observation (Fog of War). It uses frontier exploration and A* search with memory and replanning. It uses no machine learning, trained model, LLM, or external AI API.
+**Reverse Escape: Mind Wars** is a real-time multiplayer strategy game where two human architects engineer deceptive 8×8 escape rooms under an identical 30-point budget and challenge a **deterministic planning agent** operating under partial observation (Fog of War). It uses frontier exploration and A* search with memory and replanning. That baseline uses no trained model or external AI API. Solo expeditions additionally offer an optional **GPT-6 Luna Decisions + A*** mode: a pretrained model selects an observed, reachable objective, while the existing search engine plans and enforces the route. It falls back automatically when Luna is unavailable; competitive play keeps the deterministic baseline.
 
 Unlike conventional maze games where the AI sees the entire map, the **Mind Wars Autonomous Agent**:
 1. **Starts Blind (Partial Observability)**: Observes only a local Manhattan radius (`R = 2`) plus long-range unverified exit beacon signals.
@@ -72,6 +72,7 @@ npm run start
 npm test
 ```
 Runs Vitest unit & Socket.IO integration tests covering:
+- Luna choice validation, hidden-information boundaries, missing-key/error/timeout fallback, bounded calls, and server-only simulation (`tests/unit/luna.test.ts`, `tests/unit/scout.test.ts`)
 - Partial observability & fog-of-war discovery (`tests/unit/agent.test.ts`)
 - Frontier exploration & A* pathfinding around obstacles (`tests/unit/agent.test.ts`)
 - Decoy Exit investigation & Reset Pressure Plate recovery + Attempt #2 memory adaptation (`tests/unit/agent.test.ts`)
@@ -88,7 +89,7 @@ npm run build
 npm run test:e2e
 ```
 
-Browser tests cover 3D placement (including grid seams and both raised surfaces), save/restore, undo/redo, interpolated lift movement, follow camera, manual lift entry/return and blocked edges, desktop/mobile layouts, solo results, a complete two-browser architect match/rematch, solo sector unlocks, 3D destination picking, expired invites, and a live desktop-versus-touch-mobile race with checkpoint/reconnect recovery. The test configuration enables Chromium's software WebGL renderer for machines without an available GPU.
+Browser tests cover optional Luna launch with server/network fallback, 3D placement (including grid seams and both raised surfaces), save/restore, undo/redo, interpolated lift movement, follow camera, manual lift entry/return and blocked edges, desktop/mobile layouts, solo results, a complete two-browser architect match/rematch, solo sector unlocks, 3D destination picking, expired invites, and a live desktop-versus-touch-mobile race with checkpoint/reconnect recovery. The test configuration enables Chromium's software WebGL renderer for machines without an available GPU.
 
 For two devices on the same network, run the production server and open `http://<server-LAN-IP>:3001` on both devices. For hosting, use a Node service with `npm install`, `npm run build`, and `npm start`; set `PORT` to the host's assigned port. Forward WebSocket upgrades for `/socket.io/` and use `/api/health` for health checks. Keep one Node instance unless match storage is moved to a shared service. Matches live in memory and are lost on restart. No public deployment is included in the local setup.
 
@@ -114,8 +115,16 @@ For two devices on the same network, run the production server and open `http://
 
 ## Mind Wars Bounded Scoring Formula (`0 – 1,000 Pts`)
 
-Every submitted room is evaluated deterministically on the server by comparing the **Autonomous Fog-of-War Agent** against the **Omniscient BFS Validation Solver**:
+Every competitive room is evaluated deterministically on the server by comparing the **Autonomous Fog-of-War Agent** against the **Omniscient BFS Validation Solver**:
 - **35% Optimal BFS Path Length (`0 – 350 pts`)**: Structural maze complexity measured by the omniscient shortest path.
 - **30% Exploration & A* Replanning Effort (`0 – 300 pts`)**: State-space branching and number of dynamic A* replanning events forced on the AI.
 - **20% Deception & Trap Impact (`0 – 200 pts`)**: Rewards exploration overhead (`actualAgentSteps - optimalBfsSteps`), triggered Reset Pressure Plates, and investigated Decoy Exit Beacons.
 - **15% Meaningful Lock/Switch Interactions (`0 – 150 pts`)**: Counts only keys, doors, and switch gates actually used along the solution route.
+
+## Optional Luna scout
+
+In the solo studio, choose **Luna Decisions + A*** under **Expedition scout**, then **Launch expedition**. The builder preview and its metrics still show the deterministic baseline. The arena/results use the selected run; its explainer reports actual model and fallback choice counts. Luna can change objective choices, so these solo scores are sandbox comparisons, not competitive scores. The landing preview, human races, and architect duels keep their existing rules.
+
+Enable the model on the Node server using `LUNA_ENABLED=true` and `OPENAI_API_KEY` as a secret. No key belongs in client code or any `VITE_` variable. Missing configuration, refused/invalid choices, API errors, timeout, and quota exhaustion use deterministic frontier scoring. A failed model exploration is displayed as a failed run; it does not invalidate a BFS-solvable room. The game does not train a model, and memory adaptation remains explicit remembered coordinates rather than machine learning.
+
+The integration uses the official [OpenAI Decisions API](https://developers.openai.com/api/docs/guides/decisions), `POST /v1/decisions`, model `gpt-6-luna`. Only a partial-observation snapshot and reachable objective choices are sent, never the true grid or player identity. See [DEPLOYMENT.md](DEPLOYMENT.md) for setup and limits. Mocked integration tests verify the API contract and failure handling; a live Luna response requires your API key and has not been verified by those tests.

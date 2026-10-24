@@ -74,3 +74,24 @@ The GitHub Actions workflow runs unit/browser tests, builds the same Docker imag
 - Set the domain's exact HTTPS origin before opening the service publicly. If you change domains, update `PUBLIC_ORIGIN` and redeploy.
 
 This repository supplies deployment configuration. A live public URL is verified only after you deploy it in your Dokploy instance and run the checks above.
+
+## Optional Luna Decisions configuration
+
+Add these **runtime** variables in the Dokploy Application's Environment tab, then redeploy:
+
+```env
+LUNA_ENABLED=true
+OPENAI_API_KEY=<your OpenAI project API key>
+```
+
+Keep the key in Dokploy's secret/environment settings, out of Git and all frontend `VITE_` variables. Both settings are required; leave `LUNA_ENABLED=false` until you have a key. Compose forwards the same variables to `game`. The production server uses Node's built-in fetch, so no SDK or second service is required. It needs outbound HTTPS access to `api.openai.com`.
+
+In the solo studio choose **Luna Decisions + A***, then launch. Confirm **Luna choices** is greater than zero before claiming that the deployed model is working. Without a key, the replay should show zero Luna choices, fallback events, and a playable deterministic scout. No provider call is attempted in that case. Timeouts (1.2 seconds/call), refusals, invalid responses and API errors open a fallback circuit. The two attempts share an eight-call/eight-second budget; remaining choices use the baseline. The server allows two concurrent solo launches, one per IP per 30 seconds, and 60 provider calls/minute plus 1,000/day per process. Restart resets in-memory limits: set project spending controls in your OpenAI account as well. Human races and competitive scoring never depend on an external model.
+
+## If Cloudflare returns 502
+
+This application's production HTTP service listens on `PORT`, default **3001**. In Dokploy **Domains → Edit**, the **Container Port** must match it. Do not leave the domain on the dashboard's default **3000** while the process listens on **3001**. Keep Path and Internal Path at `/`. After saving, request `https://your-domain/api/health` and run the two-client smoke script above. A reachable static homepage alone does not prove WebSockets work.
+
+If it still fails, inspect application logs for `Listening on port 3001`, confirm the container health check is passing, then inspect the Traefik service/network route. Avoid changing TLS/DNS blindly when Cloudflare already reports an origin-side error. See [Cloudflare's 502 troubleshooting](https://developers.cloudflare.com/support/troubleshooting/http-status-codes/cloudflare-5xx-errors/error-502-504/).
+
+On 2026-10-25 (Asia/Kolkata), the live `revescape.noelbiju.in` route was observed pointing at 3000. Changing its Dokploy domain Container Port to 3001 restored HTTP 200 health and passed the public two-client WebSocket race/movement smoke test. This observation verifies that deployment revision's routing; it does not verify live Luna access or future releases.

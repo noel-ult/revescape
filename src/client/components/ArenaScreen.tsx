@@ -55,6 +55,8 @@ export const ArenaScreen: React.FC<ArenaScreenProps> = ({
 
   useEffect(() => {
     setPlayers(initialPlayers);
+    setStepCursor(0);
+    setIsPlaying(true);
   }, [initialPlayers]);
 
   const getActiveAgentResult = (player: PlayerSlot) => {
@@ -514,7 +516,7 @@ export const ArenaScreen: React.FC<ArenaScreenProps> = ({
                 {/* AI Knowledge State & Observable Decision Feed */}
                 <div className="flex-1 w-full space-y-3">
                   <AIExplainer step={currentStep} optimalMoves={player.solverResult?.shortestPathLength}
-                    actualMoves={agentRes?.totalSteps} compact />
+                    actualMoves={agentRes?.totalSteps} planner={agentRes?.planner} compact />
                   <div className="grid grid-cols-2 gap-2 text-xs font-mono">
                     <div className="p-2.5 rounded-xl bg-slate-950/90 border border-slate-800">
                       <div className="text-[10px] text-slate-400 mb-1">

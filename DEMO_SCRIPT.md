@@ -20,7 +20,7 @@ Load **Orbital research station** from the setup library for a guaranteed demons
 
 Click **Simulate AI**, then **Follow AI**. The robot walks, turns, warps through the transit ring, crosses both lift bridges onto the raised decks to collect access cores, then unlocks the extraction bulkheads. Keep Follow AI active for a close view during the climbs; Plan shows the complete bridge connections. These events come from its actual planning simulation.
 
-“This is a deterministic search AI: partial-observation frontier exploration plus A* pathfinding, with memory and replanning. It knows the public lift locations, but discovers the room contents through nearby observations. A* respects lift access and elevation costs. A separate full-map BFS verifies a solution and counts the shortest possible moves. There is no machine learning or LLM.”
+“This is a deterministic search AI: partial-observation frontier exploration plus A* pathfinding, with memory and replanning. It knows the public lift locations, but discovers the room contents through nearby observations. A* respects lift access and elevation costs. A separate full-map BFS verifies a solution and counts the shortest possible moves. This baseline uses no trained model or LLM. Solo launches can optionally use Luna for objective selection; routing and legality still use A*.”
 
 ## 1:10–1:40 — Show competition or adaptation
 
@@ -46,3 +46,7 @@ Open **Explore levels**. Rotate the map and point out that every outer platform 
 For a live multiplayer demo, open two browsers/devices on the same deployed HTTPS URL. Choose **Live escape race**, create a room, share its invite URL, and ready both players. Show the common three-second start, the amber rival moving on the same deck, and one player extracting into the next sector while the other remains behind. Refresh the leading player's page to demonstrate state recovery. The server validates movements and checkpoints; the first final extraction wins. Architect duel remains a separate selectable mode.
 
 Deployment is through the user's Dokploy instance using the repository Dockerfile and port 3001. Follow DEPLOYMENT.md; do not claim a public deployment until its URL and WebSocket checks have been verified.
+
+## Optional Luna demonstration
+
+In the solo studio, set **Expedition scout → Luna Decisions + A*** and launch. The arena explainer shows how many objectives Luna actually chose and how many used fallback. The builder preview remains the baseline. If no API key is configured, demonstrate the clearly labelled deterministic fallback; do not present that as a live model response. With `LUNA_ENABLED=true` and a server-side `OPENAI_API_KEY`, Luna chooses only from the scout's observed, reachable targets. A* follows legal routes, including lift transitions; BFS still validates the complete room. Compare real run metrics without promising model superiority. Architect multiplayer always uses the reproducible baseline.

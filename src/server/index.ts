@@ -6,6 +6,7 @@ import { existsSync } from 'fs';
 import { Server } from 'socket.io';
 import { validateBoard } from '../shared/validator';
 import { MatchManager } from './matchManager';
+import { createScoutRouter } from './scout';
 
 const PORT = Number(process.env.PORT || 3001);
 const origin = process.env.PUBLIC_ORIGIN?.replace(/\/$/, '');
@@ -36,6 +37,10 @@ app.post('/api/validate', (req, res) => {
   requests.set(key, bucket && bucket.resetAt > now ? { ...bucket, count: bucket.count + 1 } : { count: 1, resetAt: now + 60_000 });
   res.json(validateBoard(req.body?.grid));
 });
+app.use('/api', createScoutRouter({
+  enabled: process.env.LUNA_ENABLED === 'true',
+  apiKey: process.env.OPENAI_API_KEY,
+}, origin));
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   maxHttpBufferSize: 16 * 1024,

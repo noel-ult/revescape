@@ -18,6 +18,9 @@ interface BuilderScreenProps {
   isSubmitted?: boolean;
   opponent?: PlayerSlot;
   serverErrors?: string[];
+  scoutMode?: 'DETERMINISTIC' | 'LUNA';
+  onScoutModeChange?: (mode: 'DETERMINISTIC' | 'LUNA') => void;
+  isLaunching?: boolean;
   onGridChange?: (grid: Grid) => void;
   onSubmitRoom: (grid: Grid) => void;
   onExit: () => void;
@@ -42,6 +45,7 @@ function ModuleSketch({ module, rotation = 0 }: { module: FacilityModule; rotati
 export const BuilderScreen: React.FC<BuilderScreenProps> = ({
   mode, initialGrid, remainingSeconds = 90, isSubmitted = false, opponent,
   serverErrors = [], onGridChange, onSubmitRoom, onExit,
+  scoutMode = 'DETERMINISTIC', onScoutModeChange, isLaunching = false,
 }) => {
   const [grid, setGrid] = useState<Grid>(() => cloneGrid(initialGrid ?? createEmptyGrid()));
   const [history, setHistory] = useState<Grid[]>([]);
@@ -166,7 +170,7 @@ export const BuilderScreen: React.FC<BuilderScreenProps> = ({
   };
 
   return (
-    <div className="architect-shell">
+    <div className="architect-shell" aria-busy={isLaunching}>
       <div className="architect-heading">
         <div>
           <div className="architect-eyebrow">Reverse Escape / Architect studio</div>
@@ -266,13 +270,21 @@ export const BuilderScreen: React.FC<BuilderScreenProps> = ({
           <div className="architect-actions">
             <button className="architect-btn" onClick={onExit}>Leave studio</button>
             <div>
+              {mode === 'SOLO' && onScoutModeChange && <label className="scout-mode">Expedition scout
+                <select aria-label="Expedition scout" value={scoutMode} disabled={isLaunching}
+                  onChange={event => onScoutModeChange(event.target.value as 'DETERMINISTIC' | 'LUNA')}>
+                  <option value="DETERMINISTIC">Deterministic frontier + A*</option>
+                  <option value="LUNA">Luna Decisions + A*</option>
+                </select>
+              </label>}
               {opponent && <span className="architect-energy self-center" data-testid="opponent-status-pill">{opponent.name}: {opponent.submitted ? 'LOCKED & SUBMITTED!' : `Building · ${opponent.budgetUsed}/30`}</span>}
-              <button className="architect-btn architect-btn-primary" data-testid="submit-room-btn" disabled={!validation.valid || isSubmitted}
+              <button className="architect-btn architect-btn-primary" data-testid="submit-room-btn" disabled={!validation.valid || isSubmitted || isLaunching}
                 onClick={() => { stopPreview(); onSubmitRoom(grid); }}>
-                {isSubmitted ? 'Facility locked · waiting for opponent' : mode === 'PVP' ? 'Lock facility for battle' : 'Launch expedition'}<ArrowRight size={15} />
+                {isLaunching ? 'Planning expedition…' : isSubmitted ? 'Facility locked · waiting for opponent' : mode === 'PVP' ? 'Lock facility for battle' : 'Launch expedition'}<ArrowRight size={15} />
               </button>
             </div>
           </div>
+          {mode === 'SOLO' && scoutMode === 'LUNA' && <p className="architect-message" role="status">Luna selects observed objectives on launch; A* handles movement. If unavailable, the deterministic scout takes over. Builder previews use the baseline scout.</p>}
         </main>
       </div>
       <HumanPlayModal open={humanPlayOpen} title="Explore your facility" grid={grid}

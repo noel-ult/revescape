@@ -7,6 +7,8 @@ services:
       NODE_ENV: production
       PORT: 3001
       PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:-}
+      LUNA_ENABLED: ${LUNA_ENABLED:-false}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
     expose:
       - "3001"
     stop_grace_period: 15s

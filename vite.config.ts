@@ -8,7 +8,8 @@ export default defineConfig({
     proxy: {
       '/api': {
         target: 'http://localhost:3001',
-        changeOrigin: true,
+        // Keep the browser's host so the scout API can enforce same-origin requests in dev.
+        changeOrigin: false,
       },
       '/socket.io': {
         target: 'http://localhost:3001',

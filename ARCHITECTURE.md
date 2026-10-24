@@ -22,7 +22,7 @@ The wire format remains an 8×8 `Grid` of tile names. `getDeckTopology` derives 
 
 ## 1. Dual-Solver AI Architecture (`src/shared/agent.ts` & `src/shared/solver.ts`)
 
-The escape AI is a deterministic, hand-authored search agent: partial-observation frontier exploration + A*, with persistent memory and replanning. It uses no machine learning, training, LLM, or external AI service. Timing metrics may vary, but the same board and memory produce the same decisions and movement steps.
+The default and competitive escape AI is a deterministic, hand-authored search agent: partial-observation frontier exploration + A*, with persistent memory and replanning. This baseline uses no trained model or external AI service. Solo play can optionally select the model-backed objective policy described below. Timing metrics may vary, but the same board and memory produce the same decisions and movement steps.
 
 A core engineering requirement of **Reverse Escape: Mind Wars** is the strict separation between the **Complete-Information Validation Solver** and the **Partial-Observation Autonomous Planning Agent**:
 
@@ -61,3 +61,15 @@ A core engineering requirement of **Reverse Escape: Mind Wars** is the strict se
 Reconnect credentials are serialized only to their owner. Lobby configuration is host-only; ready/build/submit/results/rematch/race actions require an active bound player socket. Spectators receive public positions but no movement authority. Progress messages are throttled before expensive validation. Malformed packets, oversized payloads and abandoned rooms are bounded. Race inventories, trap state and switches belong to each player independently.
 
 The production build emits `dist/` and an external-dependency ESM server bundle in `dist-server/`. The multi-stage Dockerfile removes development tools and runs Node as an unprivileged user. Dokploy routes one HTTPS origin to port 3001 for assets, HTTP and WebSocket upgrades. `PUBLIC_ORIGIN` restricts browser handshake origins. Health, shutdown, payload limits, stale invites and browser reconnect behavior are covered by the deployment guide and smoke script. Matches remain in-process and are lost on redeployment; this release requires one replica.
+
+## Optional Luna objective policy
+
+`simulateAgent` is one generator-based engine. `runAutonomousAgent` completes it synchronously using the original deterministic objective scoring. `runAutonomousAgentAsync` pauses at objective decisions and asks a policy to select from already reachable candidates. It accepts only a matching candidate ID; it cannot accept a model-authored path, new coordinate, or altered world state. A* route generation, observations, inventory effects, legal deck edges, memory, and movement execution are shared between both runners. Single-candidate plans need no external choice.
+
+`ObjectiveSnapshot` contains copied observed beliefs, public lift topology, inventory, remembered hazards/decoys, detected signals, visits, and candidate utilities/routes lengths. Hidden hazards remain believed floor; unknown cells remain absent. No true grid, BFS route, opponent room, player name, or reconnect credential reaches the model. A model choice cannot override the world's legality check. `LUNA_CHOICE` and `PLANNER_FALLBACK` events record what actually selected each objective; replay metadata counts each source.
+
+`src/server/luna.ts` uses the OpenAI Decisions choice schema with model `gpt-6-luna`, server-side bearer authorization, fixed endpoint, supplied-value validation, cancellation, and a circuit that stops further provider calls after the first failure. One session spans both fresh/adapted attempts: at most eight calls, 1.2 seconds per call, and eight seconds in total, then baseline selection resumes. The router additionally limits two concurrent solo launches, one launch per IP per 30 seconds, and 60 provider requests/minute plus 1,000/day per process. Those limits reset on restart and are not a billing guarantee.
+
+`POST /api/scout` validates the room locally before any paid call and returns a complete solo replay with its score. `LUNA_ENABLED=true` and `OPENAI_API_KEY` are both required for provider calls. Missing configuration still produces an explicitly identified fallback replay. Model non-escape stays a recorded outcome; BFS solvability is unchanged. The frontend also falls back locally if this endpoint is unreachable and cancels pending work on navigation. Shared competitive validation and the Grid/Socket.IO protocol are unchanged. Solo remodel runs use the deterministic baseline and their replay labels reflect this.
+
+Luna is a pretrained model used for bounded objective selection. We do not train it, and its choices are not deterministic or guaranteed to outperform the baseline. Tests mock the provider to verify isolation, legality, protocol and failure handling; they are not evidence of live account access or game-playing quality.

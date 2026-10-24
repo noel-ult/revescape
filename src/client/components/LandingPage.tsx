@@ -48,7 +48,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         </div>
         <div className="facility-home-scene">
           <PuzzleGrid grid={SHOWCASE_FACILITY} currentStep={step} stepDurationMs={600} />
-          <div className="home-scene-caption"><span><Radio size={12} />REAL SIMULATION. REAL DECISIONS.</span><span>Frontier exploration + A* / No LLM</span></div>
+          <div className="home-scene-caption"><span><Radio size={12} />REAL SIMULATION. REAL DECISIONS.</span><span>Baseline scout / Frontier + A*</span></div>
         </div>
       </div>
       <div className="home-feature-rail">
