@@ -60,7 +60,7 @@ export default function FacilityView(props: PuzzleGridProps) {
       ) : (
         <div className="facility-canvas-wrap">
           <div ref={host} className="facility-canvas" data-testid="facility-canvas" />
-          <div className="facility-coordinates"><span>{props.sectorMap ? 'ORBITAL ROUTE / SELECT A PLATFORM' : 'SECTOR 07 / RESEARCH COMPLEX'}</span><span>{camera === 'follow' ? 'TRACKING SCOUT 01' : 'ARCHITECTURAL VIEW'}</span></div>
+          <div className="facility-coordinates"><span>{props.sectorMap ? 'ORBITAL ROUTE / SELECT A PLATFORM' : props.roomLabel ?? 'SECTOR 07 / RESEARCH COMPLEX'}</span><span>{camera === 'follow' ? 'TRACKING SCOUT 01' : 'ARCHITECTURAL VIEW'}</span></div>
           <div className="facility-view-zoom">
             <button aria-label="Zoom in" onClick={() => scene.current?.zoom(1)}><Plus size={16} /></button>
             <button aria-label="Zoom out" onClick={() => scene.current?.zoom(-1)}><Minus size={16} /></button>

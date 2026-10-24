@@ -2,7 +2,7 @@
 > **"You Build the Trap. The AI Finds a Way."**
 > Built for **Devin Hacks Kochi 2026** | Theme: **Make Room for Play**
 
-**Reverse Escape: Mind Wars** is a real-time multiplayer strategy game where two human architects engineer deceptive 8×8 escape rooms under an identical 30-point budget and challenge a **deterministic planning agent** operating under partial observation (Fog of War). It uses frontier exploration and A* search with memory and replanning. That baseline uses no trained model or external AI API. Solo expeditions additionally offer an optional **GPT-6 Luna Decisions + A*** mode: a pretrained model selects an observed, reachable objective, while the existing search engine plans and enforces the route. It falls back automatically when Luna is unavailable; competitive play keeps the deterministic baseline.
+**Reverse Escape: Mind Wars** is a real-time multiplayer strategy game where two human architects engineer deceptive 8×8 escape rooms under an identical 30-point budget and challenge a **deterministic planning agent** operating under partial observation (Fog of War). It uses frontier exploration and A* search with memory and replanning. That baseline uses no trained model or external AI API. Solo Architect studio simulations additionally offer an optional **GPT-6 Luna Decisions + A*** mode: a pretrained model selects an observed, reachable objective, while the existing search engine plans and enforces the route. It falls back automatically when Luna is unavailable; competitive play keeps the deterministic baseline.
 
 Unlike conventional maze games where the AI sees the entire map, the **Mind Wars Autonomous Agent**:
 1. **Starts Blind (Partial Observability)**: Observes only a local Manhattan radius (`R = 2`) plus long-range unverified exit beacon signals.
@@ -35,12 +35,14 @@ Lift topology is public architecture, but annex contents remain under partial ob
 
 ## Orbital expedition and live multiplayer
 
-The surrounding platforms now represent **eight playable sectors**, each with its own layout and objective: Arrival dock, Wormhole terminal, Aerial research wing, Cryogenic reactor, Mirage observatory, Chromatic vault, Skybridge complex, and Orbital command. Open **Explore levels** to choose a platform in the 3D sector map or its accessible card list. Escape a level yourself to unlock the next one; completion is saved on this browser/device. Watching the scout or remixing a room does not complete the human challenge. These are separate rooms connected by extraction checkpoints, alongside the two walkable raised annexes within a room.
+Open **Solo expedition** for eight dedicated single-player sectors: **Docking perimeter**, **Quantum relay**, **Aerial archive**, **Coolant exchange**, **Echo containment**, **Prismatic vault**, **Twin observatories**, and **Blackout command**. Each has its own layout and challenge, separate from the multiplayer race rooms. Choose a destination in the 3D map or its accessible card list; the platform previews its actual room. Play with WASD, arrows or the touch D-pad. Extraction unlocks the next sector and offers **Next sector** directly. Completion, best move counts and your selected sector are saved on this browser/device. Each room starts with fresh inventory and trap state. Earlier completion of the former shared race-room campaign is kept in its old storage key and does not complete these new solo rooms.
+
+The campaign progresses from navigation to a required portal crossing, an elevated access core, a phase-switch divider, reset mines and a decoy, three required keys, and two-deck extraction under an EMP field. Watching the scout or remixing a room in Architect studio does not complete a human challenge. These are separate rooms, alongside the two walkable raised annexes within individual rooms.
 
 Multiplayer has two modes:
 
 - **Architect duel:** the existing budgeted construction competition, with server-validated rooms, AI attempts, scores and rematches.
-- **Live escape race:** both players start after one server countdown and race through the same eight sectors. Cyan is your scout; amber is the rival when both are in the same sector. WASD, arrows and on-screen touch buttons send movement intentions; the server handles keys, switches, mines, lift transitions, checkpoints and the first-to-finish winner. Player inventories and switch states are independent. EMP fields narrow human sensors for six moves; cryo coolant delays the next move. The inventory panel shows collected access cores and phase polarity.
+- **Live escape race:** both players start after one server countdown and race through eight shared race sectors. The race retains its original layouts, independently of the dedicated solo campaign. Cyan is your scout; amber is the rival when both are in the same sector. WASD, arrows and on-screen touch buttons send movement intentions; the server handles keys, switches, mines, lift transitions, checkpoints and the first-to-finish winner. Player inventories and switch states are independent. EMP fields narrow human sensors for six moves; cryo coolant delays the next move. The inventory panel shows collected access cores and phase polarity.
 
 Invite URLs join a room across devices. Refresh/reconnect restores server-owned progress while the server remains running. Spectators can watch but cannot move either player. Opponent session tokens are private. Leaving a lobby frees the slot and transfers host ownership if necessary.
 
@@ -79,7 +81,7 @@ Runs Vitest unit & Socket.IO integration tests covering:
 - Legal lift placement, blocked cross-deck BFS/A* shortcuts, elevation costs, and deterministic visits to both starter annexes (`tests/unit/levels.test.ts`)
 - Complete-information state-space BFS validation (`tests/unit/solver.test.ts`, `tests/unit/validator.test.ts`)
 - Mind Wars bounded scoring formula (`tests/unit/scoring.test.ts`)
-- Eight validated sector layouts, shared human movement, authoritative race checkpoints/winner/reconnect/rematch, and spectator/host permission boundaries (`tests/unit/sectors.test.ts`, `tests/unit/race.test.ts`)
+- Eight dedicated solo layouts and eight race layouts, required solo mechanics, full manual-movement solution replays, saved campaign normalization, authoritative race checkpoints/winner/reconnect/rematch, and spectator/host permission boundaries (`tests/unit/expedition.test.ts`, `tests/unit/sectors.test.ts`, `tests/unit/race.test.ts`)
 - Real-time 2-player Socket.IO multiplayer lifecycle (`tests/unit/multiplayer.test.ts`)
 - Atomic module placement, rotation, caps, anchors, budget, and the starter station's actual portal/key/door sequence (`tests/unit/validator.test.ts`)
 
@@ -89,7 +91,7 @@ npm run build
 npm run test:e2e
 ```
 
-Browser tests cover optional Luna launch with server/network fallback, 3D placement (including grid seams and both raised surfaces), save/restore, undo/redo, interpolated lift movement, follow camera, manual lift entry/return and blocked edges, desktop/mobile layouts, solo results, a complete two-browser architect match/rematch, solo sector unlocks, 3D destination picking, expired invites, and a live desktop-versus-touch-mobile race with checkpoint/reconnect recovery. The test configuration enables Chromium's software WebGL renderer for machines without an available GPU.
+Browser tests cover optional Luna launch with server/network fallback, 3D placement (including grid seams and both raised surfaces), save/restore, undo/redo, interpolated lift movement, follow camera, manual lift entry/return and blocked edges, desktop/mobile layouts, solo results, a complete two-browser architect match/rematch, an eight-sector solo playthrough at mobile size using keyboard and on-screen controls, next-sector resets and saved best scores, 3D destination picking, expired invites, and a live desktop-versus-touch-mobile race with checkpoint/reconnect recovery. The test configuration enables Chromium's software WebGL renderer for machines without an available GPU.
 
 For two devices on the same network, run the production server and open `http://<server-LAN-IP>:3001` on both devices. For hosting, use a Node service with `npm install`, `npm run build`, and `npm start`; set `PORT` to the host's assigned port. Forward WebSocket upgrades for `/socket.io/` and use `/api/health` for health checks. Keep one Node instance unless match storage is moved to a shared service. Matches live in memory and are lost on restart. No public deployment is included in the local setup.
 

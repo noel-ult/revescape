@@ -2,6 +2,9 @@ import { expect, test } from '@playwright/test';
 import { PerspectiveCamera, Vector3 } from 'three';
 import { sectorPosition } from '../../src/shared/sectors';
 import { SHOWCASE_FACILITY } from '../../src/shared/facility';
+import { EXPEDITION_SECTORS, EXPEDITION_STORAGE_KEY } from '../../src/shared/expedition';
+import { solveBoardBFS } from '../../src/shared/solver';
+import { moveHuman, spawnHuman } from '../../src/shared/movement';
 
 // Project a visible sector into the Plan camera, then exercise the real pointer picker.
 async function clickSector(page: import('@playwright/test').Page, row: number, col: number, level = 0) {
@@ -229,24 +232,89 @@ test.describe('Reverse Escape — Humans vs AI E2E Verification', () => {
     await page.getByTestId('sector-map-btn').click();
     await expect(page.getByRole('heading', { name: 'Every platform is a destination.' })).toBeVisible();
     const canvas = page.locator('canvas[data-ready="true"]');
-    await expect(canvas).toHaveAttribute('data-selected-sector', 'arrival');
+    await expect(canvas).toHaveAttribute('data-selected-sector', 'exp-dock');
     await page.getByRole('button', { name: 'top camera' }).click();
-    await expect(page.getByTestId('sector-transit')).toBeDisabled();
+    await expect(page.getByTestId('sector-exp-relay')).toBeDisabled();
     await clickOrbitalPlatform(page, 1);
-    await expect(page.getByRole('status').filter({ hasText: 'Complete Arrival dock' })).toBeVisible();
+    await expect(page.getByRole('status').filter({ hasText: 'Complete Docking perimeter' })).toBeVisible();
     await page.getByTestId('enter-sector-btn').click();
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible();
     for (let i = 0; i < 14; i++) await page.keyboard.press(i < 7 ? 'ArrowRight' : 'ArrowDown', { delay: 210 });
     await expect(dialog.getByText('Sector extraction complete.')).toBeVisible();
     await dialog.getByRole('button', { name: 'Continue to sector map' }).click();
-    await expect(page.getByTestId('sector-transit')).toHaveAttribute('aria-disabled', 'false');
+    await expect(page.getByTestId('sector-exp-relay')).toHaveAttribute('aria-disabled', 'false');
     await clickOrbitalPlatform(page, 1);
-    await expect(canvas).toHaveAttribute('data-selected-sector', 'transit');
+    await expect(canvas).toHaveAttribute('data-selected-sector', 'exp-relay');
     await page.screenshot({ path: '/tmp/revescape-sector-map.png', fullPage: true });
     await page.reload(); await page.getByTestId('sector-map-btn').click();
-    await expect(page.getByTestId('sector-arrival')).toContainText('COMPLETED');
-    await expect(page.getByTestId('sector-transit')).toHaveAttribute('aria-disabled', 'false');
+    await expect(page.getByTestId('sector-exp-dock')).toContainText('COMPLETED · BEST 14 MOVES');
+    await expect(page.getByTestId('sector-exp-relay')).toHaveAttribute('aria-disabled', 'false');
+    await expect(page.locator('canvas[data-ready="true"]')).toHaveAttribute('data-selected-sector', 'exp-relay');
+  });
+
+  test('solo expedition: complete all eight distinct sectors on mobile and continue with fresh inventory', async ({ page }) => {
+    test.setTimeout(180_000);
+    const errors: string[] = [];
+    page.on('pageerror', error => errors.push(error.message));
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/');
+    await page.getByTestId('sector-map-btn').click();
+    await expect(page.getByRole('button', { name: 'Enter level', exact: true })).toBeVisible();
+    await expect(page.getByRole('group', { name: 'Multiplayer mode' })).toHaveCount(0);
+    await expect(page.locator('.sector-card')).toHaveCount(8);
+    await page.getByTestId('enter-sector-btn').click();
+    for (let index = 0; index < EXPEDITION_SECTORS.length; index++) {
+      const sector = EXPEDITION_SECTORS[index];
+      const dialog = page.getByRole('dialog', { name: sector.name });
+      await expect(dialog).toBeVisible();
+      await expect(dialog.getByRole('heading')).toContainText(`SOLO EXPEDITION ${index + 1}/8`);
+      await expect(dialog.locator('canvas[data-ready="true"]')).toBeVisible();
+      if (index === 0) {
+        const sceneBounds = (await dialog.locator('canvas[data-ready="true"]').boundingBox())!;
+        const controlsBounds = (await dialog.getByRole('button', { name: 'Move down', exact: true }).boundingBox())!;
+        expect(sceneBounds.y).toBeGreaterThanOrEqual(0);
+        expect(controlsBounds.y + controlsBounds.height).toBeLessThanOrEqual(844);
+      }
+      await expect(dialog.getByTestId('human-moves')).toHaveText('0');
+      for (const key of ['Red', 'Cyan', 'Gold']) await expect(dialog.getByTestId('access-inventory')).toContainText(`${key}: missing`);
+      await expect(dialog.getByTestId('access-inventory')).toContainText('Phase switch: OFF');
+      await expect(dialog.getByText('Sector extraction complete.')).toHaveCount(0);
+      let state = spawnHuman();
+      for (const expected of solveBoardBFS(sector.grid).steps.slice(1)) {
+        const choices = [
+          { dr: -1, dc: 0, label: 'Move up', key: 'ArrowUp' }, { dr: 0, dc: 1, label: 'Move right', key: 'ArrowRight' },
+          { dr: 1, dc: 0, label: 'Move down', key: 'ArrowDown' }, { dr: 0, dc: -1, label: 'Move left', key: 'ArrowLeft' },
+        ].map(direction => ({ ...direction, move: moveHuman(sector.grid, state, direction.dr, direction.dc) }));
+        const next = choices.find(({ move }) => !move.error && move.state.row === expected.row && move.state.col === expected.col &&
+          move.state.keyMask === expected.keyMask && move.state.switchMask === expected.switchMask)!;
+        const pause = next.move.state.lastStep.event === 'GRAVITY_SLOW' ? 470 : 210;
+        // Check the D-pad in each room, then use the keyboard for the rest of the
+        // route to avoid repeating mobile scroll/actionability waits 160 times.
+        // Both inputs go through the real cooldown and movement handlers.
+        if (state.moves === 0) {
+          await dialog.getByRole('button', { name: next.label, exact: true }).click();
+          await page.waitForTimeout(pause);
+        } else await page.keyboard.press(next.key, { delay: pause });
+        state = next.move.state;
+      }
+      await expect(dialog.getByText('Sector extraction complete.')).toBeVisible();
+      if (index === 0 || index === 7) await page.screenshot({ path: `/tmp/revescape-solo-${index === 0 ? 'first' : 'final'}-mobile.png`, fullPage: true });
+      if (index < EXPEDITION_SECTORS.length - 1) await dialog.getByTestId('next-sector-btn').click();
+      else {
+        await expect(dialog.getByRole('status')).toContainText('All 8 expedition sectors complete.');
+        await expect(dialog.getByTestId('next-sector-btn')).toHaveCount(0);
+        await dialog.getByRole('button', { name: 'Continue to sector map' }).click();
+      }
+    }
+    await expect(page.locator('.sector-card').filter({ hasText: 'COMPLETED' })).toHaveCount(8);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    const saved = await page.evaluate(key => JSON.parse(localStorage.getItem(key)!), EXPEDITION_STORAGE_KEY);
+    expect(saved.completed).toEqual(EXPEDITION_SECTORS.map(s => s.id));
+    expect(Object.keys(saved.bestMoves)).toHaveLength(8);
+    await page.reload(); await page.getByTestId('sector-map-btn').click();
+    await expect(page.locator('.sector-card').filter({ hasText: 'COMPLETED' })).toHaveCount(8);
+    expect(errors).toEqual([]);
   });
 
   test('live race: invite link, shared countdown, rival movement, checkpoint and refresh recovery', async ({ browser }) => {

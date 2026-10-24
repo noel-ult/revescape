@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Flag, Trophy } from 'lucide-react';
 import { MatchState } from '../../shared/types';
 import { SECTORS } from '../../shared/sectors';
+import { AccessInventory } from './AccessInventory';
 import { PuzzleGrid } from './PuzzleGrid';
 import { humanViewStep } from '../../shared/movement';
 import { soundFX } from '../lib/sound';
@@ -70,7 +71,7 @@ export function RaceScreen({ match, playerToken, connected, onMove, onRematch, o
         <p>Sector {(player.racer?.stageIndex ?? 0) + 1}/{match.sectorIds?.length ?? SECTORS.length} · <span data-testid={`race-moves-${player.id}`}>{player.racer?.moves ?? 0}</span> moves</p>
         <div className="race-progress">{SECTORS.map((entry, index) => <i key={entry.id} title={entry.name} className={index <= (player.racer?.stageIndex ?? 0) ? 'reached' : ''} />)}</div>
       </div>)}
-      <div className="race-inventory"><small>YOUR ACCESS CORES</small><div>{[{ bit: 1, name: 'Red' }, { bit: 2, name: 'Cyan' }, { bit: 4, name: 'Gold' }].map(key => <span key={key.bit} className={racer.keyMask & key.bit ? 'collected' : ''}>{key.name}: {racer.keyMask & key.bit ? 'collected' : 'missing'}</span>)}</div><p>Phase switch: {racer.switchMask ? 'ON' : 'OFF'}{jammed ? ' · EMP active' : ''}</p></div>
+      <AccessInventory keyMask={racer.keyMask} switchMask={racer.switchMask} empTurns={racer.empRemainingTurns} />
       <ol className="race-route">{SECTORS.map((entry, index) => <li key={entry.id} className={index === racer.stageIndex ? 'current' : index < racer.stageIndex ? 'passed' : ''}><span>{index + 1}</span>{entry.name}</li>)}</ol>
       <p className="sector-detail-note">Every exit is a checkpoint. The server verifies each move, keys and lift crossings. The first player through all eight sectors wins.</p>
       {finished && me && <button className="architect-btn architect-btn-primary" data-testid="race-rematch-btn" onClick={onRematch}><Trophy size={15} />Race again</button>}

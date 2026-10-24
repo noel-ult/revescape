@@ -6,7 +6,6 @@ import { runAutonomousAgentAsync } from '../shared/agent';
 import { SHOWCASE_FACILITY } from '../shared/facility';
 import { SectorMap } from './components/SectorMap';
 import { RaceScreen } from './components/RaceScreen';
-import { SECTORS } from '../shared/sectors';
 import { ArenaScreen } from './components/ArenaScreen';
 import { BuilderScreen } from './components/BuilderScreen';
 import { HowToPlayModal } from './components/HowToPlayModal';
@@ -325,8 +324,8 @@ export const App: React.FC = () => {
 
   const renderContent = () => {
     if (view === 'SECTORS') {
-      return <SectorMap onExit={handleLeaveToHome} onOpenStudio={sector => {
-        setSoloGrid(cloneGrid(SECTORS[sector].grid)); setView('SOLO_BUILD');
+      return <SectorMap onExit={handleLeaveToHome} onOpenStudio={grid => {
+        setSoloGrid(cloneGrid(grid)); setView('SOLO_BUILD');
       }} />;
     }
     if (view === 'SOLO_BUILD') {

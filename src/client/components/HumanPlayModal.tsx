@@ -16,8 +16,10 @@ import {
 import { humanViewStep, moveHuman } from '../../shared/movement';
 import { START_POS } from '../../shared/constants';
 import { Coordinate, Grid, SolverStep } from '../../shared/types';
+import type { Sector } from '../../shared/sectors';
 import { soundFX } from '../lib/sound';
 import { PuzzleGrid } from './PuzzleGrid';
+import { AccessInventory } from './AccessInventory';
 
 interface HumanPlayModalProps {
   open: boolean;
@@ -26,7 +28,10 @@ interface HumanPlayModalProps {
   aiOptimalMoves: number;
   aiFogMoves: number;
   onClose: () => void;
-  onEscape?: () => void;
+  onEscape?: (moves: number) => void;
+  theme?: 'ion' | 'ember' | 'void';
+  sectors?: readonly Sector[];
+  expedition?: { stage: number; total: number; nextLevelName?: string; onNextLevel?: () => void };
 }
 
 export const HumanPlayModal: React.FC<HumanPlayModalProps> = ({
@@ -37,6 +42,9 @@ export const HumanPlayModal: React.FC<HumanPlayModalProps> = ({
   aiFogMoves,
   onClose,
   onEscape,
+  theme,
+  sectors,
+  expedition,
 }) => {
   const [pos, setPos] = useState<Coordinate>({ ...START_POS });
   const [keyMask, setKeyMask] = useState(0);
@@ -52,6 +60,7 @@ export const HumanPlayModal: React.FC<HumanPlayModalProps> = ({
   const dialogRef = useGameDialog(open, onClose);
 
   const resetRun = useCallback(() => {
+    lastMoveAt.current = 0;
     setPos({ ...START_POS });
     setKeyMask(0);
     setSwitchMask(0);
@@ -99,7 +108,7 @@ export const HumanPlayModal: React.FC<HumanPlayModalProps> = ({
       setEmpTurns(next.empRemainingTurns ?? 0);
       setHistory(previous => [...previous, next.lastStep]);
       setStatusMessage(next.lastStep.description);
-      if (result.escaped) { setEscaped(true); soundFX.playSuccess(); onEscape?.(); }
+      if (result.escaped) { setEscaped(true); soundFX.playSuccess(); onEscape?.(next.moves); }
       else if (next.lastStep.event === 'COLLECT_KEY') soundFX.playKeyPickup();
       else soundFX.playStep();
     },
@@ -135,13 +144,13 @@ export const HumanPlayModal: React.FC<HumanPlayModalProps> = ({
 
   return createPortal(
     <div className="human-exploration-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
-      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={title} className="cyber-card max-w-6xl w-full rounded-2xl p-6 border border-cyan-400/50 max-h-[92vh] overflow-y-auto">
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={title} className={`cyber-card max-w-6xl w-full rounded-2xl p-6 border border-cyan-400/50 max-h-[92vh] overflow-y-auto ${expedition ? 'human-expedition' : ''}`}>
         <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-800">
           <div className="flex items-center gap-2.5">
             <Gamepad2 className="w-6 h-6 text-cyan-400" />
             <div>
               <h2 className="font-display text-lg sm:text-xl font-bold text-white">
-                HUMAN INFILTRATION TEST — {title}
+                {expedition ? `SOLO EXPEDITION ${expedition.stage}/${expedition.total}` : 'HUMAN INFILTRATION TEST'} — {title}
               </h2>
               <p className="text-xs font-mono text-cyan-300">
                 Use WASD / Arrow Keys or D-Pad to beat the AI&apos;s move count!
@@ -162,6 +171,9 @@ export const HumanPlayModal: React.FC<HumanPlayModalProps> = ({
           <div className="md:col-span-8 flex justify-center min-w-0">
             <PuzzleGrid
               grid={grid}
+              roomLabel={title}
+              theme={theme}
+              sectors={sectors}
               interactive={false}
               currentStep={currentStep}
               followLabel="Follow you"
@@ -171,12 +183,12 @@ export const HumanPlayModal: React.FC<HumanPlayModalProps> = ({
             />
           </div>
 
-          <div className="md:col-span-4 space-y-4">
+          <div className="md:col-span-4 space-y-4 human-play-info">
             {/* Score Comparison Box */}
             <div className="p-4 rounded-xl bg-slate-950/90 border border-slate-800 space-y-2.5 font-mono text-xs">
               <div className="flex justify-between">
                 <span className="text-slate-400">Your Human Moves:</span>
-                <span className="text-cyan-300 font-bold text-base">
+                <span className="text-cyan-300 font-bold text-base" data-testid="human-moves">
                   {humanMoves}
                 </span>
               </div>
@@ -196,9 +208,11 @@ export const HumanPlayModal: React.FC<HumanPlayModalProps> = ({
               </div>
             </div>
 
+            <AccessInventory keyMask={keyMask} switchMask={switchMask} empTurns={empTurns} />
+
             {/* Live Status Banner */}
             <div
-              className={`p-3 rounded-xl border text-xs font-mono ${
+              className={`human-play-status p-3 rounded-xl border text-xs font-mono ${
                 escaped
                   ? 'bg-emerald-950/70 border-emerald-400 text-emerald-200'
                   : 'bg-slate-900 border-slate-700 text-slate-200'
@@ -208,9 +222,11 @@ export const HumanPlayModal: React.FC<HumanPlayModalProps> = ({
               {statusMessage}
             </div>
 
-            {escaped && onEscape && <button className="architect-btn architect-btn-primary w-full" onClick={onClose}>Continue to sector map</button>}
+            {escaped && expedition?.onNextLevel && <button className="architect-btn architect-btn-primary w-full human-next-sector" data-testid="next-sector-btn" onClick={expedition.onNextLevel}>Next sector: {expedition.nextLevelName}<ArrowRight size={16} /></button>}
+            {escaped && expedition && !expedition.onNextLevel && <p className="sector-complete" role="status"><Trophy size={16} />All {expedition.total} expedition sectors complete.</p>}
+            {escaped && onEscape && <button className={`architect-btn w-full ${expedition?.onNextLevel ? '' : 'architect-btn-primary'}`} onClick={onClose}>Continue to sector map</button>}
             {/* On-Screen Tactical D-Pad */}
-            <div className="flex flex-col items-center gap-1.5 py-2">
+            <div className="flex flex-col items-center gap-1.5 py-2 human-play-dpad">
               <button
                 type="button"
                 aria-label="Move up"

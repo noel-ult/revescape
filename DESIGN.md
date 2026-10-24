@@ -66,6 +66,10 @@ Panels use 12–16px corners, controls 8–10px corners and fine blue-gray borde
 
 `FacilityView` owns camera controls and the blueprint fallback. `SectorMap` owns local campaign selection, locked-sector feedback and device-local completion. `RaceScreen` presents authoritative positions, touch controls and progress. `HumanPlayModal` shares movement rules with the race server. It and the game guide reuse `useGameDialog`, render outside the app root, isolate background interactions, trap focus and restore the trigger. Landing duration uses the native select intentionally; operating-system popup geometry is accepted. Explicit button groups select multiplayer mode.
 
+Solo expedition has eight dedicated rooms, independent of the race layouts. Its map uses those actual rooms for platform previews. The mission sidebar names the difficulty and required mechanic, presents a practical hint and best score, and offers human play or a studio remix. Extraction offers the next sector directly; advancing resets the room state while retaining completion and best scores on this device. Studio remixes and scout replays do not mark human missions complete.
+
+On phones, expedition play uses a shorter 3D viewport and puts movement status and the D-pad before optional score/inventory details, keeping the room and controls visible together. The next-sector action leads the completion controls. Desktop retains the scene/sidebar layout.
+
 ## Do's and Don'ts
 
 Keep names, objectives, countdowns and connection state visible. Respect reduced motion. Use native buttons, accessible labels and focus indicators. Do not add decorative fake actions, claim cloud-synced campaign progress, call search-based AI machine learning, or infer public deployment from a successful local build.

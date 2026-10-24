@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { findPortalDestination, isAnchorCell } from '../../shared/board';
 import { TILE_CATALOG } from '../../shared/constants';
+import type { Sector } from '../../shared/sectors';
 import {
   AgentSimulationStep,
   Coordinate,
@@ -27,7 +28,9 @@ import {
 
 export interface PuzzleGridProps {
   grid: Grid;
+  roomLabel?: string;
   sectorMap?: boolean;
+  sectors?: readonly Sector[];
   initialCamera?: 'orbit' | 'top' | 'follow';
   followLabel?: string;
   selectedSectorId?: string;

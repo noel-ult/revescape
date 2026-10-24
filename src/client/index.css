@@ -563,6 +563,16 @@ h1, h2, h3 { text-wrap: balance; }
 .human-exploration-overlay { background: #020811d9; backdrop-filter: blur(16px); }
 .human-exploration-overlay [role=dialog] { border-color: #3b6170; border-radius: 17px; background: linear-gradient(145deg, #12293b, #0a1725); }
 .human-exploration-overlay h2 { font-family: 'Space Grotesk', sans-serif; font-weight: 600; letter-spacing: -.5px; }
+@media (max-width: 767px) {
+  .human-exploration-overlay .human-expedition { padding: 16px; }
+  .human-expedition .facility-canvas-wrap { height: clamp(220px, 32vh, 300px); }
+  .human-expedition .human-play-info { display: flex; flex-direction: column; gap: 12px; }
+  .human-expedition .human-play-info > *,
+  .human-expedition .human-play-info > :not([hidden]) ~ :not([hidden]) { margin: 0; }
+  .human-expedition .human-play-status { order: -2; }
+  .human-expedition .human-play-dpad { order: -1; }
+  .human-expedition .human-next-sector { order: -3; }
+}
 @media (max-width: 1150px) {
   .game-nav-inner { padding: 14px 22px; }
   .facility-home { padding: 32px 22px 20px; }

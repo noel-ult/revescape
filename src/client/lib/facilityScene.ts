@@ -288,7 +288,8 @@ export class FacilityScene {
     }
     this.sectorPlatforms = [];
     const completed = new Set(this.props.completedSectors ?? []);
-    SECTORS.forEach((sector, index) => {
+    const sectors = this.props.sectors ?? SECTORS;
+    sectors.forEach((sector, index) => {
       const group = new THREE.Group();
       const [x, y, z] = sectorPosition(index);
       group.position.set(x, y, z); group.userData.sectorId = sector.id;
@@ -513,7 +514,7 @@ export class FacilityScene {
     const signature = JSON.stringify([props.grid, props.theme, props.viewMode, step?.keyMask, step?.switchMask,
       agentStep(step)?.discoveredCells, agentStep(step)?.visibleCells, agentStep(step)?.knownHazards,
       agentStep(step)?.verifiedDecoys, agentStep(step)?.triggeredResetPositions]);
-    const architectureSignature = JSON.stringify([props.theme, this.topology, props.sectorMap, props.selectedSectorId, props.completedSectors]);
+    const architectureSignature = JSON.stringify([props.theme, this.topology, props.sectorMap, props.sectors, props.selectedSectorId, props.completedSectors]);
     if (architectureSignature !== this.lastArchitectureSignature) {
       this.lastArchitectureSignature = architectureSignature;
       this.buildArchitecture();
