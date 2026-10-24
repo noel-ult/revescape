@@ -8,28 +8,45 @@ The renderer consumes `SolverStep` / `AgentSimulationStep` data. It interpolates
 
 The canvas uses a bounded pixel ratio and shadow resolution; offscreen/hidden canvases skip rendering. ResizeObserver keeps cameras fitted to their containers. Unmounting disposes geometry, shared materials, controls, observers, animation frames, and WebGL contexts. A context failure selects the blueprint renderer, preserving editing and gameplay.
 
-`src/shared/facility.ts` defines room modules and atomic, rotated placement. It produces the same `Grid` consumed by the existing validators and multiplayer protocol, so no new client-trusted game rules or network format is introduced. Module placement rejects overlap, out-of-bounds cells, anchor changes, excess budget, and component-cap violations. Solvability remains checked by `validateBoard`; an unfinished invalid draft may be edited but not submitted.
+`src/shared/facility.ts` defines room modules and atomic, rotated placement. It produces the same `Grid` consumed by the existing validators and multiplayer protocol, so no new client-trusted game rules or network format is introduced. Module placement rejects overlap, out-of-bounds cells, anchor changes, excess budget, component-cap violations, and lifts outside the main-floor perimeter of their matching annex. `validateBoard` independently checks lift placement and caps on the server. Solvability remains checked by `validateBoard`; an unfinished invalid draft may be edited but not submitted.
 
 Theme and one saved draft use local browser storage. Theme changes affect only rendering. Multiplayer attempts continue to come from the server. The old browser-only sabotage experiment is restricted to solo and explicitly restarts an unscored preview; it cannot modify a competitive attempt.
 
+## Playable deck topology (`src/shared/levels.ts`)
+
+The wire format remains an 8×8 `Grid` of tile names. `getDeckTopology` derives public access positions from `ELEVATOR_A` and `ELEVATOR_B`. With lift A present, logical rows 1–2 / columns 5–6 belong to deck 1; with lift B present, rows 5–6 / columns 1–2 belong to deck 2. Otherwise those cells belong to deck 0. Each annex relocates four cells; it does not overlay an additional floor at the same coordinate. `validDeckAccess` requires each lift to stand on the main floor directly beside its own annex, and catalog caps allow only one of each.
+
+`canTraverseDeck` permits only cardinal neighbors, and a deck change must have its corresponding lift as an endpoint. BFS expansion, A* expansion, frontier adjacency, agent execution, and human movement all check this function. Portals and reset traps keep their explicit teleport semantics. A `level` on replay steps is derived from the final coordinate and topology, so no extra level dimension is required in BFS state keys or network grids.
+
+`facilityScene.ts` maps these sectors onto raised surfaces at heights 1.45 and 2.65, constructs a sloping bridge from each access cell to its legal annex neighbor, and interpolates the scout in all three axes. Pointer picking handles hardware and each active deck plane; half-open cell bounds assign exact grid seams to one sector. Ordinary towers outside the two annexes remain scenery. The blueprint fallback uses the same logical rules.
+
 ## 1. Dual-Solver AI Architecture (`src/shared/agent.ts` & `src/shared/solver.ts`)
+
+The escape AI is a deterministic, hand-authored search agent: partial-observation frontier exploration + A*, with persistent memory and replanning. It uses no machine learning, training, LLM, or external AI service. Timing metrics may vary, but the same board and memory produce the same decisions and movement steps.
 
 A core engineering requirement of **Reverse Escape: Mind Wars** is the strict separation between the **Complete-Information Validation Solver** and the **Partial-Observation Autonomous Planning Agent**:
 
 | System | Module | World Access | Algorithm | Role |
 | :--- | :--- | :--- | :--- | :--- |
 | **Validation Engine** | `src/shared/solver.ts` | **Complete True Grid** | Exhaustive State-Space BFS over `(row, col, keyMask, switchMask, resetMask)` | Rejects impossible puzzles and computes the omniscient shortest path baseline |
-| **Autonomous Escape Agent** | `src/shared/agent.ts` | **Partial Observability Only** (`knownMap` within Manhattan radius `2`) | Frontier Exploration + Inventory-Aware A* Search + Persistent Memory + Dynamic Replanning | Explores the room under fog of war, reacts to Decoy Beacons & Reset Traps, and adapts across attempts |
+| **Autonomous Escape Agent** | `src/shared/agent.ts` | **Partial observation** (`knownMap` from local sensors) plus public lift topology | Frontier Exploration + Inventory-Aware A* Search + Persistent Memory + Dynamic Replanning | Explores the room under fog of war, reacts to Decoy Beacons & Reset Traps, and adapts across attempts |
 
 ### How the Autonomous Agent Works (`runAutonomousAgent`)
 1. **Observation Phase (`observeEnvironment`)**:
-   - At each step, reveals tiles within Manhattan distance `R = 2` into `knownMap`.
+   - At each step, reveals tiles within Manhattan distance `R = 2` on the current deck into `knownMap`. Standing on a lift permits observation across decks within that radius; an active EMP reduces the radius to 1. Public lift locations do not reveal hidden room contents. Exit/decoy beacons can be sensed within radius 5 while EMP is inactive.
    - **Deception Modeling**: Untriggered `TRAP_RESET` plates appear as ordinary `EMPTY` floor tiles until stepped on (or unless already stored in `knownHazards` from a prior attempt). `DECOY_EXIT` tiles emit a long-range beacon signal identical to the true `EXIT` until the agent approaches within distance `1` and exposes the hologram.
 2. **Objective & Frontier Selection (`selectNextObjectiveAndPlan`)**:
    - Evaluates candidate goals: known unverified Exit beacons, known uncollected keys, known switches (when a gate is blocked), and **Exploration Frontiers** (known walkable tiles adjacent to at least one unknown tile, scored by unseen neighbor count and beacon signal proximity).
 3. **A* Route Planning (`planRouteAStar`)**:
-   - Computes minimum-cost paths strictly through `knownMap`.
-   - Applies a `+45` step-cost penalty to remembered `TRAP_RESET` coordinates (`knownHazards`), causing A* to automatically route around known traps on subsequent steps or attempts whenever a safer path exists.
+   - Computes minimum-cost paths strictly through `knownMap` with current keys and switch polarity; inventory-changing interactions trigger replanning. This A* is not a full inventory-state search like BFS. Deck transitions cost 3 (ordinary step 1 + elevation 2), cryo cells cost 3, active remembered hazards add 45, and heavily revisited cells have a small penalty. Manhattan distance is an admissible heuristic for these costs.
+   - Applies a `+45` step-cost penalty to remembered active reset/EMP coordinates (`knownHazards`), causing A* to automatically route around known traps on subsequent steps or attempts whenever a safer path exists.
 4. **Cross-Attempt Memory Adaptation (`AgentMemory`)**:
    - After Attempt #1 finishes, `updatedMemory` retains `knownHazards` and `verifiedDecoys` (without revealing the rest of the hidden map).
-   - Running Attempt #2 with `priorMemory` demonstrates measurable step reduction as the AI ignores known decoys and routes around remembered reset plates.
+   - Attempt #2 with `priorMemory` ignores verified decoys and penalizes remembered hazards. It need not improve every room; the starter currently takes the same number of moves on both attempts. This is memory-based adaptation, not model training.
+
+
+## Server authority and verification
+
+`MatchManager` validates submitted grids, computes BFS and both agent attempts, and publishes authoritative scores/results. Client builder validation is feedback only. Rendering, local saves, and solo remodel previews cannot alter competitive attempts. No protocol replacement or client-supplied path/score is introduced by the deck upgrade.
+
+`tests/unit/levels.test.ts` checks legal/illegal lift placement, legal entry/return, blocked BFS and A* shortcuts, A* elevation cost, partial initial knowledge, deterministic starter paths, and visits to both annexes. `tests/e2e/game.spec.ts` exercises actual pointer editing of both raised decks at desktop/mobile sizes, manual blocked edges and both lifts, vertical scout interpolation, solo results, and two independent browser contexts completing PvP/rematch. Run `npm test`, `npm run build`, and `npm run test:e2e` for the current checkout; test coverage descriptions are not a claim of public deployment.

@@ -1,15 +1,15 @@
 # REVERSE ESCAPE: MIND WARS
-> **"You Build the Trap. The AI Learns to Escape."**  
+> **"You Build the Trap. The AI Finds a Way."**
 > Built for **Devin Hacks Kochi 2026** | Theme: **Make Room for Play**
 
-**Reverse Escape: Mind Wars** is a real-time multiplayer strategy game where two human architects engineer deceptive 8×8 escape rooms under an identical 30-point budget and challenge an **Autonomous Planning AI Agent** operating under partial observability (Fog of War).
+**Reverse Escape: Mind Wars** is a real-time multiplayer strategy game where two human architects engineer deceptive 8×8 escape rooms under an identical 30-point budget and challenge a **deterministic planning agent** operating under partial observation (Fog of War). It uses frontier exploration and A* search with memory and replanning. It uses no machine learning, trained model, LLM, or external AI API.
 
 Unlike conventional maze games where the AI sees the entire map, the **Mind Wars Autonomous Agent**:
 1. **Starts Blind (Partial Observability)**: Observes only a local Manhattan radius (`R = 2`) plus long-range unverified exit beacon signals.
 2. **Explores Unknown Frontiers**: Evaluates reachable frontier cells bordering unexplored territory using information-gain heuristics.
 3. **Plans Routes with A* Search**: Computes optimal routes through its currently known map while respecting inventory keys, switch states, and hazard costs.
 4. **Falls for & Exposes Human Deception**: Investigates **Decoy Exit Beacons** (`DECOY_EXIT`) and triggers hidden **Reset Pressure Plates** (`TRAP_RESET`) that teleport it back to Spawn `(0,0)`.
-5. **Replans Dynamically & Adapts Across Attempts**: Records discovered traps and fake exits in persistent **Agent Memory**, dynamically recalculating A* routes and escaping in significantly fewer steps on **Attempt #2 (Adapted Memory)**.
+5. **Replans Dynamically & Adapts Across Attempts**: Records discovered traps and fake exits in persistent **Agent Memory**, dynamically recalculating A* routes and using that memory on **Attempt #2 (Adapted Memory)**. Improvement depends on the room; some attempts take the same number of steps.
 
 Meanwhile, a separate **Complete-Information State-Space BFS Validation Solver** verifies every submitted room on the server so impossible rooms can never enter a match.
 
@@ -17,15 +17,19 @@ Meanwhile, a separate **Complete-Information State-Space BFS Validation Solver**
 
 The primary game surface is now a Three.js facility with connected walls, raised bulkheads, animated portal rings, access-core pedestals, coolant fields, and an articulated scout. The navigation rules still use the shared 8×8 engine; the renderer interpolates the engine's actual steps rather than choosing its own route.
 
-- **Room modules:** Place and rotate security wings, transit chambers, cryo laboratories, signal observatories, phase airlocks, and gallery partitions. A module is one undoable edit. Placement checks the footprint, anchors, collisions, component caps, and the shared energy budget.
+- **Room modules:** Place and rotate security wings, transit chambers, cryo laboratories, signal observatories, phase airlocks, and gallery partitions. A module is one undoable edit. Placement checks the footprint, anchors, collisions, component caps, legal lift locations, and the shared energy budget.
 - **Detailed construction:** Switch to Components for individual structures. Click or drag to build; right-click to erase. The validity panel updates after edits.
 - **Camera controls:** Right-drag to orbit while building; drag normally during playback. Scroll or use the +/− buttons to zoom. Plan gives an overhead view; Follow AI tracks the scout. Use two fingers to orbit/zoom on touch screens.
-- **Setups and environments:** Solo opens in the Orbital Research Station, where the scout actually traverses a portal, collects an access core, and unlocks a door. The setup library includes three other validated facilities. Ion, Ember, and Void change materials and lighting without changing competitive rules.
+- **Setups and environments:** Solo opens in the Orbital Research Station, where the scout visits both raised decks through lift bridges, traverses a portal, collects access cores, and unlocks the extraction doors. The setup library includes three other validated facilities. Ion, Ember, and Void change materials and lighting without changing competitive rules.
 - **Simulation and exploration:** Simulate AI previews the real run at a readable pace; pause it or return to building. Explore yourself uses WASD, arrows, or touch controls. Launch expedition opens the full arena with replay, fog, adaptation, and results.
 - **Save design:** Stores one draft on the current browser/device. Restore it from the setup library. Save storage is local, not a cloud account.
 - **Fallback:** The toolbar's blueprint control provides a conventional accessible editor; it also appears automatically when WebGL is unavailable. Reduced-motion preferences disable ambient animation and shorten movement presentation.
 
-The facility currently has one playable floor. Decorative towers are scenery, not extra playable buildings. Modules use the existing deterministic navigation rules; there are no freeform floors, physics-based collisions, or arbitrary scripted machinery. Solo's **Remodel & re-run** restarts a modified preview and leaves the submitted score unchanged. Competitive PvP has no client-side remodel control.
+The facility supports the main floor (deck 0) and two playable 2×2 raised annexes. Place **Aerial annex lift (`ELEVATOR_A`)** on the main floor immediately beside logical rows 1–2, columns 5–6, or **Sky observatory lift (`ELEVATOR_B`)** beside rows 5–6, columns 1–2 (zero-based). Each lift costs 1 point, with one of each allowed. The starter facility includes both. Keys, traps, walls, and other components can be placed on the raised surfaces with the same pointer editor.
+
+A lift activates its annex: those four existing grid cells move onto the raised deck, rather than creating additional cells. Without that lift they remain ordinary main-floor cells. Movement between an active annex and the main floor must pass through its matching lift; neighboring logical cells across any other deck edge are inaccessible. BFS, A*, frontier selection, and manual play share this rule. Existing portal/reset teleport effects remain explicit exceptions to adjacent movement. Visible bridges connect the lift pads to the raised surfaces, and the scout interpolates vertically along them.
+
+Lift topology is public architecture, but annex contents remain under partial observation. The scout approaches a lift to observe across decks, explores reachable frontiers, and plans through known cells. A* adds 2 movement-cost units for each deck change; full-map BFS still measures the shortest number of moves, not weighted energy cost. The 8×8 `Grid` and Socket.IO messages keep their existing format; levels are derived from lift placement. Decorative towers beyond these annexes remain scenery. There are no freeform floors or physics-based navigation. Solo's **Remodel & re-run** restarts a modified preview and leaves the submitted score unchanged. Competitive PvP has no client-side remodel control.
 
 ---
 
@@ -58,6 +62,7 @@ Runs Vitest unit & Socket.IO integration tests covering:
 - Partial observability & fog-of-war discovery (`tests/unit/agent.test.ts`)
 - Frontier exploration & A* pathfinding around obstacles (`tests/unit/agent.test.ts`)
 - Decoy Exit investigation & Reset Pressure Plate recovery + Attempt #2 memory adaptation (`tests/unit/agent.test.ts`)
+- Legal lift placement, blocked cross-deck BFS/A* shortcuts, elevation costs, and deterministic visits to both starter annexes (`tests/unit/levels.test.ts`)
 - Complete-information state-space BFS validation (`tests/unit/solver.test.ts`, `tests/unit/validator.test.ts`)
 - Mind Wars bounded scoring formula (`tests/unit/scoring.test.ts`)
 - Real-time 2-player Socket.IO multiplayer lifecycle (`tests/unit/multiplayer.test.ts`)
@@ -69,7 +74,7 @@ npm run build
 npm run test:e2e
 ```
 
-Browser tests cover 3D placement, save/restore, undo/redo, interpolated movement, follow camera, manual exploration, solo results, and a complete two-browser PvP match/rematch. The test configuration enables Chromium's software WebGL renderer for machines without an available GPU.
+Browser tests cover 3D placement (including grid seams and both raised surfaces), save/restore, undo/redo, interpolated lift movement, follow camera, manual lift entry/return and blocked edges, desktop/mobile layouts, solo results, and a complete two-browser PvP match/rematch. The test configuration enables Chromium's software WebGL renderer for machines without an available GPU.
 
 For two devices on the same network, run the production server and open `http://<server-LAN-IP>:3001` on both devices. For hosting, use a Node service with `npm install`, `npm run build`, and `npm start`; set `PORT` to the host's assigned port. Forward WebSocket upgrades for `/socket.io/` and use `/api/health` for health checks. Keep one Node instance unless match storage is moved to a shared service. Matches live in memory and are lost on restart. No public deployment is included in the local setup.
 
@@ -89,6 +94,7 @@ For two devices on the same network, run the production server and open `http://
 | **Quantum Wormhole (`PORTAL_A`)** | 2 pts | 2 | A linked pair teleports the scout between chambers |
 | **EMP Jammer (`EMP_SCRAMBLER`)** | 2 pts | 2 | Temporarily reduces the scout's vision |
 | **Cryo Field (`GRAVITY_MUD`)** | 1 pt | 6 | Adds route cost to the scout's planner |
+| **Aerial / Sky Lift (`ELEVATOR_A` / `ELEVATOR_B`)** | 1 pt | 1 ea | Activates its matching raised 2×2 annex and provides the only adjacent cross-deck access |
 
 ---
 

@@ -8,7 +8,7 @@ The landing page is already running a real scout simulation.
 
 “You build the world. The AI finds a way. This is an architectural strategy game: design a facility that challenges an exploring AI, then compete with another architect.”
 
-Enter the architect studio. Orbit the Orbital Research Station with right-drag and briefly switch between Ion and Ember environments.
+Enter the architect studio. Orbit the Orbital Research Station with right-drag. Point out the main floor and the two connected raised annexes, then briefly switch between Ion and Ember environments. Each annex holds four playable sectors, including access cores in this setup.
 
 ## 0:20–0:45 — Build architecture
 
@@ -18,9 +18,9 @@ Load **Orbital research station** from the setup library for a guaranteed demons
 
 ## 0:45–1:10 — Follow the scout
 
-Click **Simulate AI**, then **Follow AI**. The robot walks, turns, warps through the transit ring, collects an access core, and unlocks the extraction bulkhead. These events come from its actual planning simulation.
+Click **Simulate AI**, then **Follow AI**. The robot walks, turns, warps through the transit ring, crosses both lift bridges onto the raised decks to collect access cores, then unlocks the extraction bulkheads. Keep Follow AI active for a close view during the climbs; Plan shows the complete bridge connections. These events come from its actual planning simulation.
 
-“The scout only knows what it has observed. The 3D animation follows real exploration steps; a separate complete-information solver verifies that our design has a solution.”
+“This is a deterministic search AI: partial-observation frontier exploration plus A* pathfinding, with memory and replanning. It knows the public lift locations, but discovers the room contents through nearby observations. A* respects lift access and elevation costs. A separate full-map BFS verifies a solution and counts the shortest possible moves. There is no machine learning or LLM.”
 
 ## 1:10–1:40 — Show competition or adaptation
 
@@ -30,8 +30,10 @@ For a solo demonstration, return to building, load **Mirage containment complex*
 
 ## 1:40–2:00 — Make room for play
 
-Show the results and choose **Try escaping…** to enter the facility yourself with WASD or arrow keys.
+Show the results and choose **Try escaping…** to enter the facility yourself with WASD, arrow keys, or the touch D-pad. A neighboring annex sector cannot be entered from an arbitrary main-floor edge: approach its lift, cross the bridge, and return through the same lift.
 
 “The same space is a construction toy, an AI experiment, a human escape challenge, and a multiplayer competition.”
 
 The demo requires no paid API or LLM service. If a device cannot render WebGL, the blueprint fallback keeps the game playable.
+
+If asked about scope: the annexes reuse eight sectors of the existing 8×8 grid; they are not arbitrary stacked floors. Their lift components activate the raised geometry and legal access. Other distant towers are decorative. Competitive simulation and scoring remain server-authoritative. Present the local or LAN session only; a GitHub source repository is not a public game deployment.
