@@ -217,9 +217,26 @@ export type MatchPhase =
   | 'BUILDING'
   | 'VALIDATING'
   | 'AI_SOLVING'
-  | 'RESULTS';
+  | 'RESULTS'
+  | 'RACING';
+
+export type MatchMode = 'ARCHITECT' | 'RACE';
+export interface RacerState {
+  empRemainingTurns?: number;
+  moveReadyAt?: number;
+  stageIndex: number;
+  moves: number;
+  row: number;
+  col: number;
+  keyMask: number;
+  switchMask: number;
+  spentTraps: string[];
+  lastStep: SolverStep;
+  finishedAtMs?: number;
+}
 
 export interface PlayerSlot {
+  racer?: RacerState;
   id: string;
   token: string;
   name: string;
@@ -237,6 +254,10 @@ export interface PlayerSlot {
 }
 
 export interface MatchState {
+  serverTime?: number;
+  mode?: MatchMode;
+  raceStartedAt?: number;
+  sectorIds?: string[];
   roomCode: string;
   phase: MatchPhase;
   roundNumber: number;

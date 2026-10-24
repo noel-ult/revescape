@@ -44,8 +44,8 @@ export function validateBoard(
     }
     for (let c = 0; c < GRID_COLS; c++) {
       const tile = grid[r][c];
-      if (!TILE_CATALOG[tile]) {
-        errors.push(`Invalid tile type "${String(tile)}" at (${r}, ${c}).`);
+      if (typeof tile !== 'string' || !Object.hasOwn(TILE_CATALOG, tile)) {
+        errors.push(`Invalid tile type "${typeof tile === 'string' ? tile : typeof tile}" at (${r}, ${c}).`);
       } else if (!validDeckAccess(tile, r, c)) {
         errors.push(`${TILE_CATALOG[tile].label} at (${r}, ${c}) must stand on the main floor beside its annex.`);
       }

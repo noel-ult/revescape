@@ -2,63 +2,65 @@ import cors from 'cors';
 import express from 'express';
 import { createServer } from 'http';
 import path from 'path';
+import { existsSync } from 'fs';
 import { Server } from 'socket.io';
-import { fileURLToPath } from 'url';
 import { validateBoard } from '../shared/validator';
 import { MatchManager } from './matchManager';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
 const PORT = Number(process.env.PORT || 3001);
-
+const origin = process.env.PUBLIC_ORIGIN?.replace(/\/$/, '');
+const distDir = path.resolve(process.cwd(), 'dist');
+if (process.env.NODE_ENV === 'production' && !existsSync(path.join(distDir, 'index.html'))) {
+  throw new Error('Production assets are missing. Run npm run build before npm start.');
+}
 const app = express();
-app.use(cors());
-app.use(express.json());
-
+app.disable('x-powered-by');
+app.set('trust proxy', 1);
+app.use(cors({ origin: origin || false }));
+app.use(express.json({ limit: '16kb' }));
+app.use((_req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'same-origin');
+  next();
+});
+let shuttingDown = false;
 app.get('/api/health', (_req, res) => {
-  res.json({
-    status: 'ok',
-    service: 'reverse-escape-server',
-    timestamp: new Date().toISOString(),
-  });
+  res.status(shuttingDown ? 503 : 200).json({ status: shuttingDown ? 'draining' : 'ok', service: 'reverse-escape-server' });
 });
-
+const requests = new Map<string, { count: number; resetAt: number }>();
 app.post('/api/validate', (req, res) => {
-  const { grid } = req.body ?? {};
-  const result = validateBoard(grid);
-  res.json(result);
+  const now = Date.now(), key = req.ip ?? 'unknown';
+  if (requests.size > 5000) for (const [ip, value] of requests) if (value.resetAt <= now) requests.delete(ip);
+  const bucket = requests.get(key);
+  if (bucket && bucket.resetAt > now && bucket.count >= 30) { res.status(429).json({ error: 'Too many validations. Try again in a minute.' }); return; }
+  requests.set(key, bucket && bucket.resetAt > now ? { ...bucket, count: bucket.count + 1 } : { count: 1, resetAt: now + 60_000 });
+  res.json(validateBoard(req.body?.grid));
 });
-
 const httpServer = createServer(app);
-
 const io = new Server(httpServer, {
-  cors: {
-    origin: '*',
-    methods: ['GET', 'POST'],
-  },
+  maxHttpBufferSize: 16 * 1024,
+  cors: { origin: origin || false, methods: ['GET', 'POST'] },
+  allowRequest: (req, done) => done(null, !origin || !req.headers.origin || req.headers.origin === origin),
 });
-
-const matchManager = new MatchManager(io);
-
-io.on('connection', (socket) => {
-  matchManager.registerSocket(socket);
+const manager = new MatchManager(io);
+io.on('connection', socket => manager.registerSocket(socket));
+app.use('/assets', express.static(path.join(distDir, 'assets'), { immutable: true, maxAge: '1y' }));
+app.use(express.static(distDir, { maxAge: 0 }));
+app.get('*', (req, res) => {
+  if (req.path.startsWith('/api/') || req.path.startsWith('/socket.io/')) { res.status(404).json({ error: 'Not found.' }); return; }
+  res.setHeader('Cache-Control', 'no-cache');
+  res.sendFile(path.join(distDir, 'index.html'));
 });
-
-// Serve static production frontend bundle if built
-const distDir = path.resolve(__dirname, '../../dist');
-app.use(express.static(distDir));
-app.get('*', (req, res, next) => {
-  if (req.path.startsWith('/api') || req.path.startsWith('/socket.io')) {
-    return next();
-  }
-  res.sendFile(path.join(distDir, 'index.html'), (err) => {
-    if (err) {
-      res.status(200).send('Reverse Escape Backend Server Running.');
-    }
-  });
+app.use((error: { status?: number }, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  res.status(error.status || 500).json({ error: error.status === 413 ? 'Request is too large.' : 'Request could not be processed.' });
 });
-
-httpServer.listen(PORT, '0.0.0.0', () => {
-  console.log(`[REVERSE ESCAPE] Server listening on http://localhost:${PORT}`);
-});
+httpServer.listen(PORT, '0.0.0.0', () => console.log(`[REVERSE ESCAPE] Listening on port ${PORT}`));
+function shutdown() {
+  if (shuttingDown) return;
+  shuttingDown = true; manager.close();
+  io.emit('server:restarting');
+  io.close(() => httpServer.close(() => process.exit(0)));
+  setTimeout(() => process.exit(0), 10_000).unref();
+}
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);

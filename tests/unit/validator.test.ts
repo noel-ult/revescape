@@ -85,3 +85,14 @@ describe('Server-Authoritative Board Validator', () => {
     expect(events.at(-1)).toBe('EXIT');
   });
 });
+
+
+it('rejects prototype names and non-string tile payloads without coercing attacker-controlled objects', () => {
+  for (const tile of ['__proto__', 'constructor', 'toString', null, 42, { toString: 'not callable', valueOf: 'not callable' }]) {
+    const grid = createEmptyGrid();
+    (grid as unknown[][])[0][1] = tile;
+    const result = validateBoard(grid);
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContainEqual(expect.stringMatching(/Invalid tile type/));
+  }
+});

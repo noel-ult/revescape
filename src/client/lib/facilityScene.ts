@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { SECTORS, sectorPosition } from '../../shared/sectors';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { DOOR_KEY_BITS, KEY_BITS } from '../../shared/constants';
 import { canTraverseDeck, deckAt, DeckTopology, getDeckTopology } from '../../shared/levels';
@@ -25,6 +26,12 @@ export class FacilityScene {
   private world = new THREE.Group();
   private overlay = new THREE.Group();
   private robot = new THREE.Group();
+  private rival = new THREE.Group();
+  private rivalFrom = new THREE.Vector3();
+  private rivalTo = new THREE.Vector3();
+  private rivalMovedAt = 0;
+  private rivalMaterials: THREE.Material[] = [];
+  private sectorPlatforms: THREE.Object3D[] = [];
   private torso = new THREE.Group();
   private legs: THREE.Group[] = [];
   private head = new THREE.Group();
@@ -98,6 +105,15 @@ export class FacilityScene {
     rim.position.set(6, 4, -8);
     this.scene.add(rim, this.architecture, this.world, this.overlay, this.robot);
     this.makeRobot();
+    this.rival = this.robot.clone(true);
+    this.rival.traverse(object => {
+      if (object instanceof THREE.Mesh && !Array.isArray(object.material)) {
+        const material = object.material.clone();
+        if ('color' in material) (material as THREE.MeshStandardMaterial).color.lerp(new THREE.Color('#ffc581'), 0.75);
+        object.material = material; this.rivalMaterials.push(material);
+      }
+    });
+    this.rival.visible = false; this.scene.add(this.rival);
     this.observer = new ResizeObserver(this.resize);
     this.observer.observe(this.host);
     this.visibilityObserver = new IntersectionObserver(([entry]) => { this.visible = entry.isIntersecting; });
@@ -208,6 +224,7 @@ export class FacilityScene {
     group.traverse((object) => {
       if (object instanceof THREE.Mesh || object instanceof THREE.Line) {
         object.geometry.dispose();
+        if (object instanceof THREE.InstancedMesh) object.dispose();
         if (object instanceof THREE.Line) (object.material as THREE.Material).dispose();
       }
     });
@@ -249,7 +266,7 @@ export class FacilityScene {
     this.clear(this.architecture);
     const p = PALETTES[this.props.theme ?? 'ion'];
     this.scene.background = new THREE.Color(p.backdrop);
-    this.scene.fog = new THREE.Fog(p.backdrop, 21, 53);
+    this.scene.fog = new THREE.Fog(p.backdrop, this.props.sectorMap ? 45 : 21, this.props.sectorMap ? 120 : 53);
     this.box(this.architecture, [200, 0.2, 200], [0, -1.65, 0], p.backdrop);
     this.box(this.architecture, [9.2, 0.5, 9.2], [0, -0.55, 0], '#131f2a');
     this.box(this.architecture, [8.65, 0.12, 8.65], [0, -0.23, 0], p.trim);
@@ -269,14 +286,42 @@ export class FacilityScene {
         this.box(this.architecture, [0.5, 0.1, 0.2], [j, -0.5, side * 4.62], p.accent, true);
       }
     }
-    for (let i = 0; i < 16; i++) {
-      const angle = (i / 16) * Math.PI * 2;
-      const radius = 13 + (i % 3) * 3;
-      const x = Math.cos(angle) * radius, z = Math.sin(angle) * radius;
-      const height = 1.5 + (i * 7 % 6);
-      this.box(this.architecture, [1.5, height, 1.5], [x, height / 2 - 1.6, z], '#1d2a36');
-      this.box(this.architecture, [1.52, 0.045, 1.52], [x, height - 1.4, z], p.accent, true);
-    }
+    this.sectorPlatforms = [];
+    const completed = new Set(this.props.completedSectors ?? []);
+    SECTORS.forEach((sector, index) => {
+      const group = new THREE.Group();
+      const [x, y, z] = sectorPosition(index);
+      group.position.set(x, y, z); group.userData.sectorId = sector.id;
+      this.architecture.add(group); this.sectorPlatforms.push(group);
+      const selected = sector.id === this.props.selectedSectorId;
+      const color = completed.has(sector.id) ? '#8effbd' : sector.color;
+      this.box(group, [3.65, 0.3, 3.65], [0, -0.28, 0], '#253d4c');
+      this.box(group, [3.78, 0.045, 3.78], [0, -0.11, 0], color, true);
+      this.box(group, [3.6, 0.09, 3.6], [0, -0.035, 0], p.floor);
+      const walls: Array<[number, number]> = [], markers: Array<[number, number]> = [];
+      for (let r = 0; r < 8; r++) for (let c = 0; c < 8; c++) {
+        if (sector.grid[r][c] === 'WALL') walls.push([r, c]);
+        else if (sector.grid[r][c] !== 'EMPTY') markers.push([r, c]);
+      }
+      // Two draw calls per miniature keep the eight destinations cheap to render.
+      for (const [cells, wall] of [[walls, true], [markers, false]] as const) {
+        if (!cells.length) continue;
+        const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(wall ? 0.39 : 0.25, wall ? 0.36 : 0.1, wall ? 0.39 : 0.25), this.material(wall ? p.wall : '#d8ece8'), cells.length);
+        cells.forEach(([r, c], instance) => {
+          mesh.setMatrixAt(instance, new THREE.Matrix4().makeTranslation((c - 3.5) * 0.4, wall ? 0.18 : 0.08, (r - 3.5) * 0.4));
+          if (!wall) mesh.setColorAt(instance, new THREE.Color(sector.grid[r][c] === 'EXIT' ? '#bcebd9' : color));
+        });
+        mesh.receiveShadow = true; group.add(mesh);
+      }
+      for (const side of [-1, 1]) this.box(group, [0.16, y + 1.4, 0.16], [side * 1.45, -(y + 1.4) / 2 - 0.3, 1.45], '#3c5262');
+      this.cylinder(group, 0.13, selected ? 1.5 : 0.65, selected ? 0.75 : 0.32, color, true).position.z = -1.5;
+      if (selected) this.ring(group, 2.05, 0.035, color, 0.06);
+      if (this.props.sectorMap && index > 0) {
+        const previous = new THREE.Vector3(...sectorPosition(index - 1));
+        const next = new THREE.Vector3(x, y, z);
+        this.architecture.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([previous, next]), new THREE.LineBasicMaterial({ color: '#527886', transparent: true, opacity: 0.5 })));
+      }
+    });
     if (this.topology.accessA) this.buildAnnex(1, this.topology.accessA);
     if (this.topology.accessB) this.buildAnnex(2, this.topology.accessB);
   }
@@ -468,7 +513,7 @@ export class FacilityScene {
     const signature = JSON.stringify([props.grid, props.theme, props.viewMode, step?.keyMask, step?.switchMask,
       agentStep(step)?.discoveredCells, agentStep(step)?.visibleCells, agentStep(step)?.knownHazards,
       agentStep(step)?.verifiedDecoys, agentStep(step)?.triggeredResetPositions]);
-    const architectureSignature = JSON.stringify([props.theme, this.topology]);
+    const architectureSignature = JSON.stringify([props.theme, this.topology, props.sectorMap, props.selectedSectorId, props.completedSectors]);
     if (architectureSignature !== this.lastArchitectureSignature) {
       this.lastArchitectureSignature = architectureSignature;
       this.buildArchitecture();
@@ -477,6 +522,7 @@ export class FacilityScene {
       this.lastSignature = signature;
       this.buildWorld();
     }
+    this.controls.maxDistance = props.sectorMap ? 120 : 38;
     this.controls.mouseButtons.LEFT = props.interactive ? null as unknown as THREE.MOUSE : THREE.MOUSE.ROTATE;
     this.controls.mouseButtons.RIGHT = THREE.MOUSE.ROTATE;
     this.controls.touches.ONE = props.interactive ? null as unknown as THREE.TOUCH : THREE.TOUCH.ROTATE;
@@ -485,7 +531,7 @@ export class FacilityScene {
       this.from.copy(this.robot.position);
       this.to.copy(this.at(step?.row ?? 0, step?.col ?? 0));
       this.warp = Boolean(step && (step.event === 'PORTAL_WARP' || step.event === 'TRAP_RESET_TRIGGERED'));
-      if (!step || !this.lastStep || step.stepIndex !== this.lastStep.stepIndex + 1) {
+      if (!step || step.event === 'START' || !this.lastStep || step.stepIndex !== this.lastStep.stepIndex + 1) {
         this.from.copy(this.to);
         this.robot.position.copy(this.to);
       }
@@ -494,13 +540,25 @@ export class FacilityScene {
       this.moveStarted = performance.now();
       this.lastStep = step;
     }
+    const rival = props.opponentStep;
+    this.rival.visible = Boolean(rival);
+    if (rival && rival !== old.opponentStep) {
+      this.rivalFrom.copy(this.rival.position); this.rivalTo.copy(this.at(rival.row, rival.col));
+      if (!old.opponentStep || rival.event === 'PORTAL_WARP' || rival.event === 'TRAP_RESET_TRIGGERED' || rival.stepIndex !== old.opponentStep.stepIndex + 1) this.rivalFrom.copy(this.rivalTo);
+      const direction = this.rivalTo.clone().sub(this.rivalFrom);
+      if (direction.length() > 0.01) this.rival.rotation.y = Math.atan2(direction.x, direction.z);
+      this.rivalMovedAt = performance.now();
+    }
     this.buildOverlay();
   }
 
   setCamera(mode: CameraMode) {
     this.mode = mode;
     this.controls.enabled = mode !== 'follow';
-    if (mode === 'orbit') {
+    if (this.props.sectorMap && mode !== 'follow') {
+      this.camera.position.copy(mode === 'top' ? new THREE.Vector3(0, this.camera.aspect < 1.1 ? 55 : 48, 0.01) : this.camera.aspect < 1.1 ? new THREE.Vector3(37, 50, 50) : new THREE.Vector3(26, 32, 36));
+      this.controls.target.set(0, 0, 0);
+    } else if (mode === 'orbit') {
       this.camera.position.set(this.camera.aspect < 1.1 ? 17 : 13, this.camera.aspect < 1.1 ? 18 : 14, this.camera.aspect < 1.1 ? 20 : 17);
       this.controls.target.set(0, 0, 0);
     } else if (mode === 'top') {
@@ -528,6 +586,15 @@ export class FacilityScene {
     this.camera.updateProjectionMatrix();
     if (this.mode !== 'follow') this.setCamera(this.mode);
   };
+
+  private sectorAt(event: PointerEvent): string | undefined {
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    this.raycaster.setFromCamera(new THREE.Vector2((event.clientX - rect.left) / rect.width * 2 - 1, -(event.clientY - rect.top) / rect.height * 2 + 1), this.camera);
+    this.architecture.updateMatrixWorld(true);
+    let target: THREE.Object3D | null = this.raycaster.intersectObjects(this.sectorPlatforms, true)[0]?.object ?? null;
+    while (target) { if (target.userData.sectorId) return target.userData.sectorId; target = target.parent; }
+    return undefined;
+  }
 
   private cellAt(event: PointerEvent) {
     const rect = this.renderer.domElement.getBoundingClientRect();
@@ -576,12 +643,14 @@ export class FacilityScene {
       if (!this.activePointers.size) this.multiTouch = false;
       return;
     }
-    if (!this.props.interactive || this.mode === 'follow') return;
     if (Math.hypot(event.clientX - this.pointerStart.x, event.clientY - this.pointerStart.y) > 5) return;
+    if (this.props.sectorMap && event.button === 0) { const id = this.sectorAt(event); if (id) this.props.onSectorSelect?.(id); return; }
+    if (!this.props.interactive || this.mode === 'follow') return;
     const cell = this.cellAt(event);
     if (cell) this.props.onCellInteract?.(cell.row, cell.col, event.button === 2);
   };
   private pointerMove = (event: PointerEvent) => {
+    if (this.props.sectorMap) { this.renderer.domElement.style.cursor = this.sectorAt(event) ? 'pointer' : 'grab'; return; }
     if (!this.props.interactive) return;
     const cell = this.cellAt(event);
     const key = cell ? `${cell.row},${cell.col}` : '';
@@ -611,6 +680,10 @@ export class FacilityScene {
       const eased = progress * progress * (3 - 2 * progress);
       this.robot.position.lerpVectors(this.from, this.to, this.reducedMotion ? 1 : eased);
       this.robot.scale.setScalar(1);
+    }
+    if (this.rival.visible) {
+      const progress = Math.min(1, (now - this.rivalMovedAt) / (this.props.stepDurationMs ?? 150));
+      this.rival.position.lerpVectors(this.rivalFrom, this.rivalTo, progress * progress * (3 - 2 * progress));
     }
     const turn = Math.atan2(Math.sin(this.yaw - this.robot.rotation.y), Math.cos(this.yaw - this.robot.rotation.y));
     this.robot.rotation.y += turn * Math.min(1, dt * 13);
@@ -663,6 +736,8 @@ export class FacilityScene {
     this.renderer.domElement.dataset.agentPosition = `${this.robot.position.x.toFixed(3)},${this.robot.position.z.toFixed(3)}`;
     this.renderer.domElement.dataset.agentLevel = `${this.props.currentStep?.level ?? 0}`;
     this.renderer.domElement.dataset.agentHeight = this.robot.position.y.toFixed(3);
+    this.renderer.domElement.dataset.opponentPosition = this.rival.visible ? `${this.rival.position.x.toFixed(3)},${this.rival.position.z.toFixed(3)}` : '';
+    this.renderer.domElement.dataset.selectedSector = this.props.selectedSectorId ?? '';
   };
 
   dispose() {
@@ -680,6 +755,7 @@ export class FacilityScene {
     this.clear(this.scene);
     for (const material of this.materials.values()) material.dispose();
     (this.scanner.material as THREE.Material).dispose();
+    this.rivalMaterials.forEach(material => material.dispose());
     this.renderer.dispose();
     this.renderer.forceContextLoss();
     canvas.remove();

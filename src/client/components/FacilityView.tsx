@@ -15,7 +15,7 @@ export default function FacilityView(props: PuzzleGridProps) {
   const scene = useRef<FacilityScene>();
   const latestProps = useRef(props);
   latestProps.current = effectiveProps;
-  const [camera, setCamera] = useState<CameraMode>('orbit');
+  const [camera, setCamera] = useState<CameraMode>(props.initialCamera ?? 'orbit');
   const [blueprint, setBlueprint] = useState(false);
   const [unavailable, setUnavailable] = useState(false);
 
@@ -46,7 +46,7 @@ export default function FacilityView(props: PuzzleGridProps) {
             <button key={mode} type="button" aria-label={`${mode} camera`} aria-pressed={camera === mode}
               disabled={blueprint || unavailable} className={camera === mode ? 'active' : ''} onClick={() => changeCamera(mode)}>
               {mode === 'orbit' ? <Box size={14} /> : mode === 'top' ? <Grid2X2 size={14} /> : <Video size={14} />}
-              <span>{mode === 'orbit' ? 'Orbit' : mode === 'top' ? 'Plan' : 'Follow AI'}</span>
+              <span>{mode === 'orbit' ? 'Orbit' : mode === 'top' ? 'Plan' : props.followLabel ?? 'Follow AI'}</span>
             </button>
           ))}
           <button type="button" aria-label="Toggle accessible blueprint" aria-pressed={blueprint} onClick={() => setBlueprint(!blueprint)}><Grid2X2 size={14} /></button>
@@ -60,7 +60,7 @@ export default function FacilityView(props: PuzzleGridProps) {
       ) : (
         <div className="facility-canvas-wrap">
           <div ref={host} className="facility-canvas" data-testid="facility-canvas" />
-          <div className="facility-coordinates"><span>SECTOR 07 / RESEARCH COMPLEX</span><span>{camera === 'follow' ? 'TRACKING SCOUT 01' : 'ARCHITECTURAL VIEW'}</span></div>
+          <div className="facility-coordinates"><span>{props.sectorMap ? 'ORBITAL ROUTE / SELECT A PLATFORM' : 'SECTOR 07 / RESEARCH COMPLEX'}</span><span>{camera === 'follow' ? 'TRACKING SCOUT 01' : 'ARCHITECTURAL VIEW'}</span></div>
           <div className="facility-view-zoom">
             <button aria-label="Zoom in" onClick={() => scene.current?.zoom(1)}><Plus size={16} /></button>
             <button aria-label="Zoom out" onClick={() => scene.current?.zoom(-1)}><Minus size={16} /></button>
@@ -69,7 +69,7 @@ export default function FacilityView(props: PuzzleGridProps) {
           <div className="facility-agent-label"><Crosshair size={14} /><span>SCOUT 01</span><b>DECK {step?.level ?? 0} / {step ? step.event === 'EXIT' ? 'EXTRACTED' : 'EXPLORING' : 'STANDBY'}</b></div>
           <div className="facility-help">{camera === 'follow'
             ? 'Following Scout 01 · Walls cut away for visibility · Use Orbit or Plan to build'
-            : props.interactive ? 'Click to build · Right-drag to orbit · Scroll to zoom · Two fingers on touch'
+            : props.sectorMap ? 'Click a platform to choose its level · Drag to orbit' : props.interactive ? 'Click to build · Right-drag to orbit · Scroll to zoom · Two fingers on touch'
             : 'Drag to orbit · Scroll to zoom · Follow AI for a close-up'}</div>
         </div>
       )}

@@ -3,15 +3,22 @@ import { runAutonomousAgent } from '../shared/agent';
 import { cloneGrid, computeGridStats, createEmptyGrid } from '../shared/board';
 import { calculateScore } from '../shared/scoring';
 import { solveBoardBFS } from '../shared/solver';
-import { Grid, MatchPhase, MatchState, PlayerSlot } from '../shared/types';
+import { SECTORS, Sector } from '../shared/sectors';
+import { moveHuman, spawnHuman } from '../shared/movement';
+import { TILE_CATALOG } from '../shared/constants';
+import { Grid, MatchMode, MatchPhase, MatchState, PlayerSlot, TileType } from '../shared/types';
 import { validateBoard } from '../shared/validator';
 
 interface InternalPlayer extends PlayerSlot {
   socketId: string;
   lastValidGrid: Grid;
+  lastMoveAt?: number;
+  lastProgressAt?: number;
 }
 
 interface InternalMatch {
+  mode: MatchMode;
+  raceStartedAt?: number;
   roomCode: string;
   phase: MatchPhase;
   roundNumber: number;
@@ -45,11 +52,89 @@ export class MatchManager {
   private matches = new Map<string, InternalMatch>();
   private socketToRoom = new Map<string, { roomCode: string; token: string }>();
 
-  constructor(io: Server) {
+  private cleanupTimer: NodeJS.Timeout;
+  constructor(io: Server, private options: { moveCooldownMs?: number; raceCountdownMs?: number; sectors?: Sector[] } = {}) {
     this.io = io;
+    this.cleanupTimer = setInterval(() => {
+      for (const [code, match] of this.matches) {
+        const sockets = this.io.sockets.adapter.rooms.get(code);
+        if ((!sockets?.size && Date.now() - match.createdAt > 120_000) || Date.now() - match.createdAt > 7_200_000) {
+          this.clearTimers(match); this.matches.delete(code);
+          for (const [id, mapping] of this.socketToRoom) if (mapping.roomCode === code) { this.io.sockets.sockets.get(id)?.leave(code); this.socketToRoom.delete(id); }
+        }
+      }
+    }, 30_000);
+    this.cleanupTimer.unref();
+  }
+
+  public close(): void {
+    clearInterval(this.cleanupTimer);
+    for (const match of this.matches.values()) this.clearTimers(match);
+  }
+
+  private playerFor(socket: Socket, match: InternalMatch): InternalPlayer | undefined {
+    const binding = this.socketToRoom.get(socket.id);
+    if (binding?.roomCode !== match.roomCode) return undefined;
+    return match.players.find(player => player.socketId === socket.id && player.token === binding.token);
+  }
+
+  private leave(socket: Socket): void {
+    const mapping = this.socketToRoom.get(socket.id);
+    if (!mapping) return;
+    const match = this.matches.get(mapping.roomCode);
+    socket.leave(mapping.roomCode); this.socketToRoom.delete(socket.id);
+    if (!match) return;
+    match.spectators.delete(socket.id);
+    const player = match.players.find(p => p.socketId === socket.id);
+    if (player) {
+      player.connected = false; player.ready = false;
+      if (match.phase === 'LOBBY') {
+        match.players = match.players.filter(p => p !== player);
+        if (match.hostToken === player.token) match.hostToken = match.players[0]?.token ?? '';
+      }
+    }
+    this.broadcastState(match);
   }
 
   public registerSocket(socket: Socket): void {
+    let allowance = 80, updatedAt = Date.now();
+    socket.use((packet, next) => {
+      const now = Date.now(); allowance = Math.min(80, allowance + (now - updatedAt) * 0.04); updatedAt = now;
+      const payload = packet[1];
+      const malformed = payload !== undefined && typeof payload !== 'function' &&
+        (!payload || typeof payload !== 'object' || Array.isArray(payload) ||
+          ['roomCode', 'playerName', 'playerToken'].some(key => payload[key] !== undefined &&
+            (typeof payload[key] !== 'string' || payload[key].length > 200)));
+      if (malformed || allowance < 1) {
+        const ack = packet.at(-1); if (typeof ack === 'function') ack({ ok: false, error: 'Invalid or too frequent request.', errors: ['Invalid or too frequent request.'] });
+        return;
+      }
+      allowance--; next();
+    });
+    socket.on('lobby:leave', () => this.leave(socket));
+    socket.on('race:move', (payload: { roomCode?: string; dr?: number; dc?: number }) => {
+      const match = this.matches.get(payload?.roomCode?.toUpperCase() ?? '');
+      if (!match || match.phase !== 'RACING' || match.mode !== 'RACE' || Date.now() < (match.raceStartedAt ?? 0)) return;
+      const player = this.playerFor(socket, match);
+      if (!player?.racer || player.racer.finishedAtMs !== undefined || Date.now() < (player.racer.moveReadyAt ?? 0)) return;
+      const sectors = this.options.sectors ?? SECTORS;
+      const sector = sectors[player.racer.stageIndex];
+      if (!sector) return;
+      const result = moveHuman(sector.grid, player.racer, payload.dr!, payload.dc!);
+      if (result.error) { socket.emit('race:blocked', { message: result.error }); return; }
+      player.lastMoveAt = Date.now();
+      player.racer = { ...player.racer, ...result.state, moveReadyAt: Date.now() + (this.options.moveCooldownMs ?? (result.state.lastStep.event === 'GRAVITY_SLOW' ? 450 : 150)) };
+      if (result.escaped) {
+        const moves = player.racer.moves;
+        if (player.racer.stageIndex === sectors.length - 1) {
+          player.racer.finishedAtMs = Date.now() - match.raceStartedAt!;
+          match.winnerId = player.id; this.transitionToResults(match); return;
+        }
+        const spawned = spawnHuman();
+        player.racer = { ...spawned, moves, lastStep: { ...spawned.lastStep, stepIndex: moves }, stageIndex: player.racer.stageIndex + 1 };
+      }
+      this.broadcastState(match);
+    });
     socket.on(
       'lobby:create',
       (
@@ -57,10 +142,12 @@ export class MatchManager {
           playerName?: string;
           playerToken?: string;
           buildDurationSec?: 45 | 90;
+          mode?: MatchMode;
         },
         callback?: (res: { ok: boolean; roomCode?: string; state?: MatchState; error?: string }) => void
       ) => {
         try {
+          if (this.socketToRoom.has(socket.id) || this.matches.size >= 200) { callback?.({ ok: false, error: 'Leave your current room before creating another, or try again shortly.' }); return; }
           const name = (payload?.playerName || 'Architect-1').trim().slice(0, 20) || 'Architect-1';
           const token = payload?.playerToken || `tok_${socket.id}`;
           const duration: 45 | 90 = payload?.buildDurationSec === 45 ? 45 : 90;
@@ -83,6 +170,7 @@ export class MatchManager {
           };
 
           const match: InternalMatch = {
+            mode: payload?.mode === 'RACE' ? 'RACE' : 'ARCHITECT',
             roomCode,
             phase: 'LOBBY',
             roundNumber: 1,
@@ -133,6 +221,11 @@ export class MatchManager {
         // Check if reconnecting player
         const existingPlayer = match.players.find((p) => p.token === token);
         if (existingPlayer) {
+          if (existingPlayer.socketId !== socket.id) {
+            const previous = this.io.sockets.sockets.get(existingPlayer.socketId);
+            previous?.leave(code); this.socketToRoom.delete(existingPlayer.socketId);
+            previous?.emit('session:replaced');
+          }
           existingPlayer.socketId = socket.id;
           existingPlayer.connected = true;
           if (payload?.playerName?.trim()) {
@@ -149,7 +242,7 @@ export class MatchManager {
         if (match.players.length < 2 && match.phase === 'LOBBY') {
           const emptyGrid = createEmptyGrid();
           const newPlayer: InternalPlayer = {
-            id: match.players.length === 0 ? 'P1' : 'P2',
+            id: match.players.some(p => p.id === 'P1') ? 'P2' : 'P1',
             token,
             socketId: socket.id,
             name: name || 'Architect-2',
@@ -169,6 +262,7 @@ export class MatchManager {
           return;
         }
 
+        if (match.spectators.size >= 32) { callback?.({ ok: false, error: 'This room has reached its spectator limit.' }); return; }
         // Otherwise join as spectator
         match.spectators.add(socket.id);
         this.bindSocketToRoom(socket, code, token);
@@ -182,7 +276,7 @@ export class MatchManager {
       'lobby:config',
       (payload: { roomCode: string; buildDurationSec: 45 | 90 }) => {
         const match = this.matches.get((payload?.roomCode || '').toUpperCase());
-        if (!match || match.phase !== 'LOBBY') return;
+        if (!match || match.phase !== 'LOBBY' || this.playerFor(socket, match)?.token !== match.hostToken) return;
         const duration: 45 | 90 = payload.buildDurationSec === 45 ? 45 : 90;
         match.buildDurationSec = duration;
         match.remainingSeconds = duration;
@@ -202,9 +296,7 @@ export class MatchManager {
           return;
         }
 
-        const player = match.players.find(
-          (p) => p.token === payload.playerToken || p.socketId === socket.id
-        );
+        const player = this.playerFor(socket, match);
         if (!player) {
           callback?.({ ok: false, error: 'You are not an active player in this lobby.' });
           return;
@@ -215,7 +307,9 @@ export class MatchManager {
         this.broadcastState(match);
 
         if (match.players.length === 2 && match.players.every((p) => p.ready)) {
-          this.startBuildingPhase(match);
+          if (match.players.every(p => p.connected)) {
+            if (match.mode === 'RACE') this.startRace(match); else this.startBuildingPhase(match);
+          }
         }
       }
     );
@@ -230,16 +324,15 @@ export class MatchManager {
         const match = this.matches.get((payload?.roomCode || '').toUpperCase());
         if (!match || match.phase !== 'BUILDING') return;
 
-        const player = match.players.find(
-          (p) => p.token === payload.playerToken || p.socketId === socket.id
-        );
+        const player = this.playerFor(socket, match);
         if (!player || player.submitted) return;
 
         if (payload.grid) {
-          const stats = computeGridStats(payload.grid);
+          if (Date.now() - (player.lastProgressAt ?? 0) < 200) return;
+          player.lastProgressAt = Date.now();
           const validation = validateBoard(payload.grid);
-          player.budgetUsed = stats.budgetUsed;
-          player.tilesPlaced = stats.tilesPlaced;
+          player.budgetUsed = validation.budgetUsed;
+          player.tilesPlaced = Object.entries(validation.tileCounts).reduce((total, [tile, count]) => total + (TILE_CATALOG[tile as TileType].cost > 0 ? count : 0), 0);
           player.isValidDraft = validation.valid;
           if (validation.valid) {
             player.lastValidGrid = cloneGrid(payload.grid);
@@ -265,9 +358,7 @@ export class MatchManager {
           return;
         }
 
-        const player = match.players.find(
-          (p) => p.token === payload.playerToken || p.socketId === socket.id
-        );
+        const player = this.playerFor(socket, match);
         if (!player) {
           callback?.({ ok: false, errors: ['Player not found in match.'] });
           return;
@@ -312,7 +403,7 @@ export class MatchManager {
       'match:advance_to_results',
       (payload: { roomCode: string }) => {
         const match = this.matches.get((payload?.roomCode || '').toUpperCase());
-        if (!match || match.phase !== 'AI_SOLVING') return;
+        if (!match || match.phase !== 'AI_SOLVING' || !this.playerFor(socket, match)) return;
         this.transitionToResults(match);
       }
     );
@@ -324,14 +415,12 @@ export class MatchManager {
         callback?: (res: { ok: boolean }) => void
       ) => {
         const match = this.matches.get((payload?.roomCode || '').toUpperCase());
-        if (!match) {
+        if (!match || match.phase !== 'RESULTS') {
           callback?.({ ok: false });
           return;
         }
 
-        const player = match.players.find(
-          (p) => p.token === payload.playerToken || p.socketId === socket.id
-        );
+        const player = this.playerFor(socket, match);
         if (!player) {
           callback?.({ ok: false });
           return;
@@ -370,11 +459,17 @@ export class MatchManager {
 
   private bindSocketToRoom(socket: Socket, roomCode: string, token: string): void {
     const prev = this.socketToRoom.get(socket.id);
-    if (prev && prev.roomCode !== roomCode) {
-      socket.leave(prev.roomCode);
-    }
+    if (prev && prev.roomCode !== roomCode) this.leave(socket);
     socket.join(roomCode);
     this.socketToRoom.set(socket.id, { roomCode, token });
+  }
+
+  private startRace(match: InternalMatch): void {
+    this.clearTimers(match);
+    match.phase = 'RACING'; match.winnerId = null; match.rematchVotes.clear();
+    match.raceStartedAt = Date.now() + (this.options.raceCountdownMs ?? 3000);
+    for (const player of match.players) { player.racer = { ...spawnHuman(), stageIndex: 0 }; player.lastMoveAt = 0; }
+    this.broadcastState(match);
   }
 
   private startBuildingPhase(match: InternalMatch): void {
@@ -482,7 +577,7 @@ export class MatchManager {
 
   private resetForRematch(match: InternalMatch): void {
     match.roundNumber += 1;
-    this.startBuildingPhase(match);
+    if (match.mode === 'RACE') this.startRace(match); else this.startBuildingPhase(match);
   }
 
   private clearTimers(match: InternalMatch): void {
@@ -501,11 +596,15 @@ export class MatchManager {
 
     return {
       roomCode: match.roomCode,
+      serverTime: Date.now(),
+      mode: match.mode,
+      raceStartedAt: match.raceStartedAt,
+      sectorIds: match.mode === 'RACE' ? (this.options.sectors ?? SECTORS).map(sector => sector.id) : undefined,
       phase: match.phase,
       roundNumber: match.roundNumber,
       buildDurationSec: match.buildDurationSec,
       remainingSeconds: match.remainingSeconds,
-      hostToken: match.hostToken,
+      hostToken: viewerToken === match.hostToken ? match.hostToken : '',
       spectatorCount: match.spectators.size,
       winnerId: match.winnerId,
       rematchVotes: Array.from(match.rematchVotes),
@@ -514,7 +613,8 @@ export class MatchManager {
         const isSelf = viewerToken && p.token === viewerToken;
         return {
           id: p.id,
-          token: p.token,
+          token: isSelf ? p.token : '',
+          racer: p.racer,
           name: p.name,
           connected: p.connected,
           ready: p.ready,
@@ -522,7 +622,7 @@ export class MatchManager {
           budgetUsed: p.budgetUsed,
           tilesPlaced: p.tilesPlaced,
           isValidDraft: p.isValidDraft,
-          grid: revealAllGrids || isSelf ? p.grid : undefined,
+          grid: revealAllGrids ? p.grid : isSelf ? (p.grid ?? p.lastValidGrid) : undefined,
           solverResult: revealAllGrids ? p.solverResult : undefined,
           agentResult: revealAllGrids ? p.agentResult : undefined,
           adaptedAgentResult: revealAllGrids ? p.adaptedAgentResult : undefined,

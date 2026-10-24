@@ -8,12 +8,12 @@ export function getPlayerToken(): string {
   try {
     let token = sessionStorage.getItem(TOKEN_KEY);
     if (!token) {
-      token = `plr_${Math.random().toString(36).slice(2, 10)}_${Date.now().toString(36)}`;
+      token = `plr_${crypto.randomUUID?.() ?? Array.from(crypto.getRandomValues(new Uint32Array(4)), value => value.toString(16)).join('')}`;
       sessionStorage.setItem(TOKEN_KEY, token);
     }
     return token;
   } catch {
-    return `plr_${Math.random().toString(36).slice(2, 10)}`;
+    return `plr_${crypto.randomUUID?.() ?? Array.from(crypto.getRandomValues(new Uint32Array(4)), value => value.toString(16)).join('')}`;
   }
 }
 

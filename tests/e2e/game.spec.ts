@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { PerspectiveCamera, Vector3 } from 'three';
+import { sectorPosition } from '../../src/shared/sectors';
 import { SHOWCASE_FACILITY } from '../../src/shared/facility';
 
 // Project a visible sector into the Plan camera, then exercise the real pointer picker.
@@ -16,6 +17,16 @@ async function clickSector(page: import('@playwright/test').Page, row: number, c
   if (level === 2) position.add(new Vector3(-3.4, 2.65, 2.1));
   position.project(camera);
   await canvas.click({ position: { x: (position.x + 1) * bounds.width / 2, y: (1 - position.y) * bounds.height / 2 } });
+}
+
+async function clickOrbitalPlatform(page: import('@playwright/test').Page, index: number) {
+  const canvas = page.locator('canvas[data-ready="true"]');
+  const bounds = (await canvas.boundingBox())!;
+  const aspect = bounds.width / bounds.height;
+  const camera = new PerspectiveCamera(aspect < 1.25 ? 48 : 39, aspect, 0.1, 100);
+  camera.position.set(0, aspect < 1.1 ? 55 : 48, 0.01); camera.lookAt(0, 0, 0); camera.updateMatrixWorld();
+  const point = new Vector3(...sectorPosition(index)).project(camera);
+  await canvas.click({ position: { x: (point.x + 1) * bounds.width / 2, y: (1 - point.y) * bounds.height / 2 } });
 }
 
 test.describe('Reverse Escape — Humans vs AI E2E Verification', () => {
@@ -184,6 +195,82 @@ test.describe('Reverse Escape — Humans vs AI E2E Verification', () => {
       expect(errors).toEqual([]);
     });
   }
+
+  test('orbital map: play a platform, unlock the next sector, select it in 3D and retain progress', async ({ page }) => {
+    await page.goto('/');
+    await page.getByTestId('sector-map-btn').click();
+    await expect(page.getByRole('heading', { name: 'Every platform is a destination.' })).toBeVisible();
+    const canvas = page.locator('canvas[data-ready="true"]');
+    await expect(canvas).toHaveAttribute('data-selected-sector', 'arrival');
+    await page.getByRole('button', { name: 'top camera' }).click();
+    await expect(page.getByTestId('sector-transit')).toBeDisabled();
+    await clickOrbitalPlatform(page, 1);
+    await expect(page.getByRole('status')).toContainText('Complete Arrival dock');
+    await page.getByTestId('enter-sector-btn').click();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible();
+    for (let i = 0; i < 14; i++) await page.keyboard.press(i < 7 ? 'ArrowRight' : 'ArrowDown', { delay: 210 });
+    await expect(dialog.getByText('Sector extraction complete.')).toBeVisible();
+    await dialog.getByRole('button', { name: 'Continue to sector map' }).click();
+    await expect(page.getByTestId('sector-transit')).toHaveAttribute('aria-disabled', 'false');
+    await clickOrbitalPlatform(page, 1);
+    await expect(canvas).toHaveAttribute('data-selected-sector', 'transit');
+    await page.screenshot({ path: '/tmp/revescape-sector-map.png', fullPage: true });
+    await page.reload(); await page.getByTestId('sector-map-btn').click();
+    await expect(page.getByTestId('sector-arrival')).toContainText('COMPLETED');
+    await expect(page.getByTestId('sector-transit')).toHaveAttribute('aria-disabled', 'false');
+  });
+
+  test('live race: invite link, shared countdown, rival movement, checkpoint and refresh recovery', async ({ browser }) => {
+    test.setTimeout(120000);
+    const a = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+    const b = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+    const pageA = await a.newPage(), pageB = await b.newPage();
+    const errors: string[] = [];
+    for (const page of [pageA, pageB]) page.on('pageerror', error => errors.push(error.message));
+    await pageA.goto('/'); await pageA.getByTestId('player-name-input').fill('AliceRunner');
+    await pageA.getByTestId('race-mode-btn').click(); await pageA.getByTestId('create-lobby-btn').click();
+    const code = (await pageA.getByTestId('lobby-room-code').textContent())!.trim();
+    const invite = await pageA.getByRole('textbox', { name: 'Shareable invite URL' }).inputValue();
+    expect(invite).toContain(`?room=${code}`);
+    await pageB.goto(`/?room=${code}`);
+    await expect(pageB.getByTestId('lobby-slot-0')).toContainText('AliceRunner');
+    await pageA.getByTestId('lobby-ready-btn').click(); await pageB.getByTestId('lobby-ready-btn').click();
+    await expect(pageA.getByTestId('race-heading')).toHaveText('Arrival dock');
+    await pageA.keyboard.press('ArrowRight');
+    await expect(pageA.getByTestId('race-moves-P1')).toHaveText('0');
+    await expect(pageA.getByRole('button', { name: 'Move right', exact: true })).toBeEnabled();
+    await pageA.getByRole('button', { name: 'Move right', exact: true }).click();
+    await expect(pageB.getByTestId('race-moves-P1')).toHaveText('1');
+    const rivalCanvas = pageB.locator('canvas[data-ready="true"]');
+    await expect.poll(async () => Number((await rivalCanvas.getAttribute('data-opponent-position'))?.split(',')[0] ?? -99)).toBeGreaterThan(-3.4);
+    await pageB.getByRole('button', { name: 'Move down', exact: true }).tap();
+    await expect(pageA.getByTestId('race-moves-P2')).toHaveText('1');
+    await pageA.evaluate(() => window.scrollTo(0, 0)); await pageB.evaluate(() => window.scrollTo(0, 0));
+    await pageA.screenshot({ path: '/tmp/revescape-race-desktop.png', fullPage: true });
+    await pageB.screenshot({ path: '/tmp/revescape-race-mobile.png', fullPage: true });
+    for (let i = 0; i < 13; i++) {
+      await expect(pageA.getByRole('button', { name: 'Move right', exact: true })).toBeEnabled();
+      await pageA.keyboard.press(i < 6 ? 'ArrowRight' : 'ArrowDown', { delay: 210 });
+      await expect(pageA.getByTestId('race-moves-P1')).toHaveText(String(i + 2));
+    }
+    await expect(pageA.getByTestId('race-heading')).toHaveText('Wormhole terminal');
+    await expect(pageB.getByTestId('race-moves-P1')).toHaveText('14');
+    await pageA.reload();
+    await expect(pageA.getByTestId('race-heading')).toHaveText('Wormhole terminal');
+    await expect(pageA.getByTestId('race-moves-P1')).toHaveText('14');
+    expect(errors).toEqual([]);
+    await a.close(); await b.close();
+  });
+
+  test('an expired invite reports the missing room and allows starting another game', async ({ page }) => {
+    await page.goto('/?room=ZZZZZZ');
+    await expect(page.getByTestId('landing-error')).toContainText('not found');
+    await expect(page.getByTestId('create-lobby-btn')).toBeEnabled();
+    expect(page.url()).not.toContain('room=');
+    await page.getByTestId('create-lobby-btn').click();
+    await expect(page.getByTestId('lobby-room-code')).toBeVisible();
+  });
 
   test('Online PvP Multiplayer: 2 players join via room code, build traps, watch AI Escape, and see winner + rematch', async ({
     browser,

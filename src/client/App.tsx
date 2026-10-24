@@ -3,6 +3,9 @@ import { cloneGrid, computeGridStats, createEmptyGrid } from '../shared/board';
 import { Grid, MatchState, PlayerSlot } from '../shared/types';
 import { validateBoard } from '../shared/validator';
 import { SHOWCASE_FACILITY } from '../shared/facility';
+import { SectorMap } from './components/SectorMap';
+import { RaceScreen } from './components/RaceScreen';
+import { SECTORS } from '../shared/sectors';
 import { ArenaScreen } from './components/ArenaScreen';
 import { BuilderScreen } from './components/BuilderScreen';
 import { HowToPlayModal } from './components/HowToPlayModal';
@@ -20,6 +23,7 @@ import {
 } from './lib/socket';
 
 type AppView =
+  | 'SECTORS'
   | 'LANDING'
   | 'SOLO_BUILD'
   | 'SOLO_ARENA'
@@ -36,6 +40,7 @@ export const App: React.FC = () => {
   const [matchState, setMatchState] = useState<MatchState | null>(null);
   const [landingError, setLandingError] = useState<string | null>(null);
   const [serverBuildErrors, setServerBuildErrors] = useState<string[]>([]);
+  const [lobbyPending, setLobbyPending] = useState(false);
   const [helpOpen, setHelpOpen] = useState<boolean>(false);
 
   // Solo Mode State
@@ -61,13 +66,15 @@ export const App: React.FC = () => {
             playerName: getSavedPlayerName() || 'Architect',
             playerToken,
           },
-          (res: { ok: boolean; state?: MatchState }) => {
+          (res: { ok: boolean; state?: MatchState; error?: string }) => {
             if (res?.ok && res.state) {
               setMatchState(res.state);
               saveRoomCode(res.state.roomCode);
               setView('PVP');
             } else {
-              saveRoomCode('');
+              saveRoomCode(''); setMatchState(null); setView('LANDING');
+              setLandingError(res?.error ?? 'Your previous room is no longer available. Create a new lobby.');
+              const url = new URL(window.location.href); url.searchParams.delete('room'); window.history.replaceState({}, '', url);
             }
           }
         );
@@ -75,6 +82,8 @@ export const App: React.FC = () => {
     };
 
     const onDisconnect = () => setConnected(false);
+    const onReplaced = () => { saveRoomCode(''); setMatchState(null); setView('LANDING'); setLandingError('This player session was opened in another window.'); };
+    const onRestart = () => setLandingError('The game server is restarting. Your room may need to be recreated.');
 
     const onStateUpdate = (nextState: MatchState) => {
       setMatchState(nextState);
@@ -89,6 +98,8 @@ export const App: React.FC = () => {
     };
 
     socket.on('connect', onConnect);
+    socket.on('session:replaced', onReplaced);
+    socket.on('server:restarting', onRestart);
     socket.on('disconnect', onDisconnect);
     socket.on('match:state_update', onStateUpdate);
     socket.on('match:timer_tick', onTimerTick);
@@ -99,6 +110,8 @@ export const App: React.FC = () => {
 
     return () => {
       socket.off('connect', onConnect);
+      socket.off('session:replaced', onReplaced);
+      socket.off('server:restarting', onRestart);
       socket.off('disconnect', onDisconnect);
       socket.off('match:state_update', onStateUpdate);
       socket.off('match:timer_tick', onTimerTick);
@@ -110,17 +123,21 @@ export const App: React.FC = () => {
     savePlayerName(name);
   };
 
-  const handleCreateLobby = (duration: 45 | 90) => {
+  const handleCreateLobby = (duration: 45 | 90, mode: 'ARCHITECT' | 'RACE' = 'ARCHITECT') => {
     setLandingError(null);
     const socket = getSocket();
-    socket.emit(
+    setLobbyPending(true);
+    socket.timeout(8000).emit(
       'lobby:create',
       {
         playerName: playerName.trim() || 'Architect-1',
         playerToken,
         buildDurationSec: duration,
+        mode,
       },
-      (res: { ok: boolean; roomCode?: string; state?: MatchState; error?: string }) => {
+      (error: Error | null, res: { ok: boolean; roomCode?: string; state?: MatchState; error?: string }) => {
+        setLobbyPending(false);
+        if (error) { setLandingError('The server did not respond. Check your connection and try again.'); return; }
         if (res?.ok && res.state) {
           saveRoomCode(res.state.roomCode);
           setMatchState(res.state);
@@ -135,14 +152,17 @@ export const App: React.FC = () => {
   const handleJoinLobby = (roomCode: string) => {
     setLandingError(null);
     const socket = getSocket();
-    socket.emit(
+    setLobbyPending(true);
+    socket.timeout(8000).emit(
       'lobby:join',
       {
         roomCode,
         playerName: playerName.trim() || 'Architect-2',
         playerToken,
       },
-      (res: { ok: boolean; roomCode?: string; state?: MatchState; error?: string }) => {
+      (error: Error | null, res: { ok: boolean; roomCode?: string; state?: MatchState; error?: string }) => {
+        setLobbyPending(false);
+        if (error) { setLandingError('The server did not respond. Check your connection and try again.'); return; }
         if (res?.ok && res.state) {
           saveRoomCode(res.state.roomCode);
           setMatchState(res.state);
@@ -155,6 +175,7 @@ export const App: React.FC = () => {
   };
 
   const handleLeaveToHome = () => {
+    getSocket().emit('lobby:leave');
     saveRoomCode('');
     setMatchState(null);
     setPvpReplayArena(false);
@@ -264,6 +285,11 @@ export const App: React.FC = () => {
   };
 
   const renderContent = () => {
+    if (view === 'SECTORS') {
+      return <SectorMap onExit={handleLeaveToHome} onOpenStudio={sector => {
+        setSoloGrid(cloneGrid(SECTORS[sector].grid)); setView('SOLO_BUILD');
+      }} />;
+    }
     if (view === 'SOLO_BUILD') {
       return (
         <BuilderScreen
@@ -311,7 +337,12 @@ export const App: React.FC = () => {
         );
       }
 
-      if (matchState.phase === 'BUILDING' || matchState.phase === 'VALIDATING') {
+      if (matchState.mode === 'RACE') {
+        return <RaceScreen match={matchState} playerToken={playerToken} connected={connected}
+          onMove={(dr, dc) => getSocket().emit('race:move', { roomCode: matchState.roomCode, dr, dc })}
+          onRematch={handlePvpRematch} onExit={handleLeaveToHome} />;
+      }
+      if (matchState.phase === 'BUILDING'  || matchState.phase === 'VALIDATING') {
         const me = matchState.players.find((p) => p.token === playerToken);
         const opponent = matchState.players.find((p) => p.token !== playerToken);
 
@@ -319,6 +350,7 @@ export const App: React.FC = () => {
           <BuilderScreen
             key={`round-${matchState.roundNumber}`}
             mode="PVP"
+            initialGrid={me?.grid}
             remainingSeconds={matchState.remainingSeconds}
             isSubmitted={Boolean(me?.submitted)}
             opponent={opponent}
@@ -361,6 +393,9 @@ export const App: React.FC = () => {
         onCreateLobby={handleCreateLobby}
         onJoinLobby={handleJoinLobby}
         onStartSolo={handleStartSolo}
+        onOpenSectors={() => setView('SECTORS')}
+        connected={connected}
+        pending={lobbyPending}
         onOpenHelp={() => setHelpOpen(true)}
         errorMessage={landingError}
       />
@@ -375,6 +410,7 @@ export const App: React.FC = () => {
         onGoHome={handleLeaveToHome}
         onOpenHelp={() => setHelpOpen(true)}
       />
+      {view === 'PVP' && !connected && <p className="connection-banner" role="status">Connection lost. Reconnecting to your multiplayer room…</p>}
       <main className="flex-1">{renderContent()}</main>
       <HowToPlayModal open={helpOpen} onClose={() => setHelpOpen(false)} />
     </div>

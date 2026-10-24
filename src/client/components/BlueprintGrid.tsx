@@ -27,6 +27,13 @@ import {
 
 export interface PuzzleGridProps {
   grid: Grid;
+  sectorMap?: boolean;
+  initialCamera?: 'orbit' | 'top' | 'follow';
+  followLabel?: string;
+  selectedSectorId?: string;
+  completedSectors?: string[];
+  onSectorSelect?: (id: string) => void;
+  opponentStep?: SolverStep | null;
   interactive?: boolean;
   onCellInteract?: (row: number, col: number, isErase?: boolean) => void;
   currentStep?: SolverStep | AgentSimulationStep | null;

@@ -8,6 +8,7 @@ import {
   ShieldCheck,
   Users,
 } from 'lucide-react';
+import { SECTORS } from '../../shared/sectors';
 import { MatchState } from '../../shared/types';
 
 interface LobbyScreenProps {
@@ -27,23 +28,25 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
 }) => {
   const [copiedCode, setCopiedCode] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [copyError, setCopyError] = useState('');
+  const race = matchState.mode === 'RACE';
 
   const me = matchState.players.find((p) => p.token === playerToken);
   const isHost = matchState.hostToken === playerToken;
 
   const inviteUrl = `${window.location.origin}/?room=${matchState.roomCode}`;
 
-  const handleCopyCode = () => {
-    navigator.clipboard?.writeText(matchState.roomCode).catch(() => {});
-    setCopiedCode(true);
-    setTimeout(() => setCopiedCode(false), 2000);
+  const copy = async (text: string, link: boolean) => {
+    try {
+      if (!navigator.clipboard) throw new Error('Clipboard unavailable');
+      await navigator.clipboard.writeText(text);
+      setCopyError('');
+      if (link) setCopiedLink(true); else setCopiedCode(true);
+      setTimeout(() => { setCopiedLink(false); setCopiedCode(false); }, 2000);
+    } catch { setCopyError('Copy is unavailable here. Select the invite link or room code below.'); }
   };
-
-  const handleCopyLink = () => {
-    navigator.clipboard?.writeText(inviteUrl).catch(() => {});
-    setCopiedLink(true);
-    setTimeout(() => setCopiedLink(false), 2000);
-  };
+  const handleCopyCode = () => { void copy(matchState.roomCode, false); };
+  const handleCopyLink = () => { void copy(inviteUrl, true); };
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
@@ -51,7 +54,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-800">
           <div>
             <span className="text-xs font-mono uppercase tracking-widest text-cyan-400">
-              MULTIPLAYER ARENA LOBBY
+              {race ? 'LIVE ESCAPE RACE LOBBY' : 'MULTIPLAYER ARENA LOBBY'}
             </span>
             <h2 className="font-display text-2xl sm:text-3xl font-extrabold text-white mt-1">
               Awaiting Architects
@@ -102,8 +105,10 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
           </div>
         </div>
 
+        <div className="mt-5"><label className="text-xs text-slate-400 block">Invite a friend on another device<input aria-label="Shareable invite URL" readOnly value={inviteUrl} onFocus={event => event.target.select()} className="mt-2 w-full p-3 rounded-lg bg-slate-950 border border-slate-700 text-cyan-200 font-mono text-xs" /></label>{copyError && <p role="status" className="architect-message">{copyError}</p>}</div>
+        {race && <p className="mt-4 text-sm text-slate-300 leading-relaxed">Both players start together and race through {SECTORS.length} orbital sectors. See your rival live, use lifts and access cores, and reach the final exit first. Each exit is a checkpoint.</p>}
         {/* Match Timer Configuration */}
-        <div className="my-6 flex flex-wrap items-center justify-between gap-4 p-4 rounded-xl bg-slate-900/80 border border-slate-800">
+        {!race && <div className="my-6 flex flex-wrap items-center justify-between gap-4 p-4 rounded-xl bg-slate-900/80 border border-slate-800">
           <div className="flex items-center gap-2.5">
             <Clock className="w-5 h-5 text-cyan-400" />
             <div>
@@ -144,6 +149,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
           </div>
         </div>
 
+        }
         {/* Two Player Slots */}
         <div className="grid sm:grid-cols-2 gap-4 my-6">
           {[0, 1].map((slotIdx) => {
