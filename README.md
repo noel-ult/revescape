@@ -130,3 +130,23 @@ In the solo studio, choose **Luna Decisions + A*** under **Expedition scout**, t
 Enable the model on the Node server using `LUNA_ENABLED=true` and `OPENAI_API_KEY` as a secret. No key belongs in client code or any `VITE_` variable. Missing configuration, refused/invalid choices, API errors, timeout, and quota exhaustion use deterministic frontier scoring. A failed model exploration is displayed as a failed run; it does not invalidate a BFS-solvable room. The game does not train a model, and memory adaptation remains explicit remembered coordinates rather than machine learning.
 
 The integration uses the official [OpenAI Decisions API](https://developers.openai.com/api/docs/guides/decisions), `POST /v1/decisions`, model `gpt-6-luna`. Only a partial-observation snapshot and reachable objective choices are sent, never the true grid or player identity. See [DEPLOYMENT.md](DEPLOYMENT.md) for setup and limits. Mocked integration tests verify the API contract and failure handling; a live Luna response requires your API key and has not been verified by those tests.
+
+### Ghost races, missions and sharing
+
+- **Race the AI ghost:** choose this action on a solo sector or shared facility. A three-second countdown starts you alongside the amber deterministic frontier + A* scout. Its normal movement takes 350 ms per move, with longer coolant crossings. Inventories and switches are independent. EMP hides the ghost while your sensors are jammed. Extraction still advances the campaign if the scout wins; a human victory earns a saved ghost badge. No model API is called.
+- **Three stars per sector:** earn one for extraction, one for matching or beating the scout’s move count, and one for the displayed bonus mission. Bonuses include a clean escape, stepping on the decoy, visiting both decks or surviving the EMP. Best stars and ghost victories stay on this device. Previously completed sectors keep completion and receive one completion star.
+- **Share facility:** generate a playable snapshot link from Architect studio. A friend can open it in another browser, escape it, race its scout or remix the exact layout. Links encode a versioned compact Grid and pass the same budget, anchor, lift and solvability checks. Editing the studio does not change an existing snapshot; use **Update challenge link**. Clipboard failure leaves a selectable link.
+
+### Daily challenge and verified rankings
+
+**Play today’s daily challenge** opens a date-seeded room shared by all players, resetting at 00:00 UTC. Only room mutations that pass BFS validation and the deterministic scout are accepted. Start or resume with a callsign and play using WASD, arrows or movement buttons. The server owns position, inventory, cooldowns and score; claimed client scores are ignored. Extraction records one best result per anonymous browser-session identity. The public table shows the 25 lowest move counts, with earlier completion breaking equal scores. Callsigns are player-provided, not authenticated accounts.
+
+Rankings use atomic writes to `DATA_DIR/daily-scores.json`, retaining at most 500 scores per day for 31 days. Active runs are in process and expire on restart or UTC rollover. Mount `/app/data` persistently in Dokploy to retain scores across deployments; Compose defines this volume. Failed writes are reported as unsaved rankings. Corrupt existing storage is not overwritten automatically.
+
+### Co-op expedition
+
+Two players cooperate through three dedicated missions. Recovered access cores are shared instantly. In co-op, a phase switch is a pressure pad: one player stays on it while the teammate crosses its gate and recovers a core that opens the holder’s bypass. Both must extract before the team advances. Later rooms split the search across raised decks. EMP and spent mines stay individual. Movement, shared inventory, checkpoints and team victory are server-authoritative; invite, reconnect and rematch use the existing room flow.
+
+### Decision rewind
+
+In a solo AI arena, pause or scrub **Replay step**, inspect the scout’s knowledge, and replace one cell with a wall, clear floor, cryo field or EMP in **Decision rewind**. **Compare continuation** validates the edit and resumes from that state with the actual keys, polarity, discovered map, masked hazard beliefs, spent mines, portal usage and original replay prefix. Lift topology stays fixed during a rewind; redesign decks in the studio. Hidden edits are learned through observation. Continuations use deterministic frontier + A*, including when the retained prefix used Luna; no new model call is made. **Restore original replay** recovers the original trace. Submitted scores stay unchanged, and this editor is not available in competitive matches.

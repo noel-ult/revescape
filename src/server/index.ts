@@ -7,6 +7,7 @@ import { Server } from 'socket.io';
 import { validateBoard } from '../shared/validator';
 import { MatchManager } from './matchManager';
 import { createScoutRouter } from './scout';
+import { createDailyRouter } from './daily';
 
 const PORT = Number(process.env.PORT || 3001);
 const origin = process.env.PUBLIC_ORIGIN?.replace(/\/$/, '');
@@ -41,6 +42,7 @@ app.use('/api', createScoutRouter({
   enabled: process.env.LUNA_ENABLED === 'true',
   apiKey: process.env.OPENAI_API_KEY,
 }, origin));
+app.use('/api', createDailyRouter({ dataDir: process.env.DATA_DIR || path.resolve('data'), publicOrigin: origin }));
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   maxHttpBufferSize: 16 * 1024,

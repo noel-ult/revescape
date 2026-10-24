@@ -6,6 +6,36 @@
 .scout-mode select { max-width: 100%; min-height: 42px; padding: 8px 12px; border: 1px solid #24394e; border-radius: 8px; background: #0e1b2a; color: #ecf5f8; font: inherit; }
 .scout-mode select:focus-visible { outline: 2px solid #9ef6d8; outline-offset: 3px; }
 
+.facility-share { padding: 12px 0; border-top: 1px solid #2b4257; }
+.facility-share-link { display: flex; align-items: end; gap: 10px; margin-top: 12px; }
+.facility-share-link label, .daily-name { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 6px; color: #8da3b6; font-size: 11px; }
+.facility-share input, .daily-name input, .decision-rewind input, .decision-rewind select { width: 100%; min-width: 0; min-height: 40px; padding: 8px 10px; border: 1px solid #2b4257; border-radius: 7px; background: #0a1928; color: #ecf5f8; font-size: 12px; }
+.facility-share p, .decision-rewind p { margin-top: 10px; color: #8da3b6; font-size: 11px; line-height: 1.7; }
+.expedition-missions { border-top: 1px solid #2b4257; padding-top: 14px; color: #8da3b6; font-size: 11px; line-height: 1.9; }
+.expedition-missions > strong { color: #a7f2d6; font-size: 25px; letter-spacing: 4px; }
+.ghost-race-status { padding: 12px; border: 1px solid #ae8059; border-radius: 9px; color: #ffd7a8; font-size: 13px; }
+.ghost-race-status small { display: block; margin-top: 7px; color: #8da3b6; font-size: 10px; line-height: 1.6; }
+.daily-controls { margin: 16px 0; padding: 16px; border: 1px solid #2b4257; border-radius: 12px; background: #0e1b2a; }
+.daily-dpad { display: flex; gap: 10px; justify-content: center; }
+.daily-dpad .architect-btn { min-height: 44px; min-width: 44px; justify-content: center; }
+.daily-controls > p { margin-top: 14px; color: #a7f2d6; font-size: 12px; line-height: 1.6; }
+.daily-rankings { margin-top: 14px; }
+.daily-rankings li { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid #2b4257; font-size: 12px; color: #8da3b6; }
+.daily-rankings strong { color: #a7f2d6; }
+.decision-rewind { margin-bottom: 22px; padding: 18px; border: 1px solid #2b4257; border-radius: 12px; }
+.decision-rewind h3 { color: #ecf5f8; font-weight: 600; }
+.decision-rewind form { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; margin-top: 12px; }
+.decision-rewind label { display: flex; flex-direction: column; gap: 6px; font-size: 11px; color: #8da3b6; }
+.decision-rewind input { width: 80px; }
+.decision-rewind .rewind-comparison { color: #a7f2d6; }
+.facility-home-help[data-testid="daily-challenge-btn"] { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+@media (max-width: 767px) {
+  .human-playable .ghost-race-status { order: -3; }
+  .human-playable.human-ghost-race .facility-canvas-wrap { height: 220px; }
+  .daily-page .facility-canvas-wrap { height: 300px; }
+  .facility-share-link { flex-wrap: wrap; }
+}
+
 @layer base {
   body {
     background-color: #040711;
@@ -564,14 +594,14 @@ h1, h2, h3 { text-wrap: balance; }
 .human-exploration-overlay [role=dialog] { border-color: #3b6170; border-radius: 17px; background: linear-gradient(145deg, #12293b, #0a1725); }
 .human-exploration-overlay h2 { font-family: 'Space Grotesk', sans-serif; font-weight: 600; letter-spacing: -.5px; }
 @media (max-width: 767px) {
-  .human-exploration-overlay .human-expedition { padding: 16px; }
-  .human-expedition .facility-canvas-wrap { height: clamp(220px, 32vh, 300px); }
-  .human-expedition .human-play-info { display: flex; flex-direction: column; gap: 12px; }
-  .human-expedition .human-play-info > *,
-  .human-expedition .human-play-info > :not([hidden]) ~ :not([hidden]) { margin: 0; }
-  .human-expedition .human-play-status { order: -2; }
-  .human-expedition .human-play-dpad { order: -1; }
-  .human-expedition .human-next-sector { order: -3; }
+  .human-exploration-overlay .human-playable { padding: 16px; }
+  .human-playable .facility-canvas-wrap { height: clamp(220px, 32vh, 300px); }
+  .human-playable .human-play-info { display: flex; flex-direction: column; gap: 12px; }
+  .human-playable .human-play-info > *,
+  .human-playable .human-play-info > :not([hidden]) ~ :not([hidden]) { margin: 0; }
+  .human-playable .human-play-status { order: -2; }
+  .human-playable .human-play-dpad { order: -1; }
+  .human-playable .human-next-sector { order: -3; }
 }
 @media (max-width: 1150px) {
   .game-nav-inner { padding: 14px 22px; }

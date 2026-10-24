@@ -1,6 +1,6 @@
 import { createPortal } from 'react-dom';
 import { useGameDialog } from '../lib/useGameDialog';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowDown,
   ArrowLeft,
@@ -20,6 +20,8 @@ import type { Sector } from '../../shared/sectors';
 import { soundFX } from '../lib/sound';
 import { PuzzleGrid } from './PuzzleGrid';
 import { AccessInventory } from './AccessInventory';
+import { runAutonomousAgent } from '../../shared/agent';
+import { ExpeditionRunReport, GHOST_MOVE_MS, ghostTimeline } from '../../shared/challenges';
 
 interface HumanPlayModalProps {
   open: boolean;
@@ -29,6 +31,8 @@ interface HumanPlayModalProps {
   aiFogMoves: number;
   onClose: () => void;
   onEscape?: (moves: number) => void;
+  onRunComplete?: (report: ExpeditionRunReport) => void;
+  ghostRace?: boolean;
   theme?: 'ion' | 'ember' | 'void';
   sectors?: readonly Sector[];
   expedition?: { stage: number; total: number; nextLevelName?: string; onNextLevel?: () => void };
@@ -45,6 +49,8 @@ export const HumanPlayModal: React.FC<HumanPlayModalProps> = ({
   theme,
   sectors,
   expedition,
+  onRunComplete,
+  ghostRace = false,
 }) => {
   const [pos, setPos] = useState<Coordinate>({ ...START_POS });
   const [keyMask, setKeyMask] = useState(0);
@@ -57,10 +63,23 @@ export const HumanPlayModal: React.FC<HumanPlayModalProps> = ({
   const [empTurns, setEmpTurns] = useState(0);
   const [escaped, setEscaped] = useState(false);
   const lastMoveAt = useRef(0);
+  const ghostStartedAt = useRef(0);
+  const [ghostNow, setGhostNow] = useState(0);
+  const [finishMs, setFinishMs] = useState<number | null>(null);
+  const ghost = useMemo(() => ghostRace ? runAutonomousAgent(grid) : undefined, [grid, ghostRace]);
+  const ghostTimes = useMemo(() => ghost ? ghostTimeline(ghost.steps) : [], [ghost]);
+  const ghostElapsed = Math.max(0, ghostNow - ghostStartedAt.current);
+  const ghostCountdown = ghostRace ? Math.max(0, Math.ceil((ghostStartedAt.current - ghostNow) / 1000)) : 0;
+  const ghostIndex = ghostTimes.reduce((index, time, i) => time <= (finishMs ?? ghostElapsed) ? i : index, 0);
+  const ghostDuration = ghostTimes.at(-1) ?? 0;
   const dialogRef = useGameDialog(open, onClose);
 
   const resetRun = useCallback(() => {
     lastMoveAt.current = 0;
+    const now = performance.now();
+    ghostStartedAt.current = now + 3000;
+    setGhostNow(now);
+    setFinishMs(null);
     setPos({ ...START_POS });
     setKeyMask(0);
     setSwitchMask(0);
@@ -89,10 +108,17 @@ export const HumanPlayModal: React.FC<HumanPlayModalProps> = ({
     }
   }, [open, resetRun]);
 
+  useEffect(() => {
+    if (!open || !ghostRace || escaped) return;
+    const timer = setInterval(() => setGhostNow(performance.now()), 50);
+    return () => clearInterval(timer);
+  }, [open, ghostRace, escaped]);
+
   const moveDelta = useCallback(
     (dr: number, dc: number) => {
       if (escaped) return;
       const now = performance.now();
+      if (ghostRace && now < ghostStartedAt.current) { setStatusMessage('Get ready — you and the scout start together.'); return; }
       if (now - lastMoveAt.current < (history.at(-1)?.event === 'GRAVITY_SLOW' ? 450 : 190)) return;
       lastMoveAt.current = now;
       const result = moveHuman(grid, {
@@ -108,11 +134,15 @@ export const HumanPlayModal: React.FC<HumanPlayModalProps> = ({
       setEmpTurns(next.empRemainingTurns ?? 0);
       setHistory(previous => [...previous, next.lastStep]);
       setStatusMessage(next.lastStep.description);
-      if (result.escaped) { setEscaped(true); soundFX.playSuccess(); onEscape?.(next.moves); }
+      if (result.escaped) {
+        const elapsed = Math.max(0, now - ghostStartedAt.current);
+        setFinishMs(elapsed); setGhostNow(now); setEscaped(true); soundFX.playSuccess(); onEscape?.(next.moves);
+        onRunComplete?.({ moves: next.moves, history: [...history, next.lastStep], ghostWon: ghostRace && elapsed < ghostDuration });
+      }
       else if (next.lastStep.event === 'COLLECT_KEY') soundFX.playKeyPickup();
       else soundFX.playStep();
     },
-    [escaped, grid, keyMask, pos.col, pos.row, spentTraps, switchMask, history, onEscape, empTurns]
+    [escaped, grid, keyMask, pos.col, pos.row, spentTraps, switchMask, history, onEscape, empTurns, ghostRace, ghostDuration, onRunComplete]
   );
 
   useEffect(() => {
@@ -144,7 +174,7 @@ export const HumanPlayModal: React.FC<HumanPlayModalProps> = ({
 
   return createPortal(
     <div className="human-exploration-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
-      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={title} className={`cyber-card max-w-6xl w-full rounded-2xl p-6 border border-cyan-400/50 max-h-[92vh] overflow-y-auto ${expedition ? 'human-expedition' : ''}`}>
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={title} className={`cyber-card human-playable max-w-6xl w-full rounded-2xl p-6 border border-cyan-400/50 max-h-[92vh] overflow-y-auto ${expedition ? 'human-expedition' : ''} ${ghostRace ? 'human-ghost-race' : ''}`}>
         <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-800">
           <div className="flex items-center gap-2.5">
             <Gamepad2 className="w-6 h-6 text-cyan-400" />
@@ -176,6 +206,7 @@ export const HumanPlayModal: React.FC<HumanPlayModalProps> = ({
               sectors={sectors}
               interactive={false}
               currentStep={currentStep}
+              opponentStep={ghostRace && empTurns === 0 ? ghost?.steps[ghostIndex] : null}
               followLabel="Follow you"
               viewMode={empTurns > 0 ? 'AI_FOG' : 'WORLD'}
               visitedSteps={history}
@@ -184,6 +215,7 @@ export const HumanPlayModal: React.FC<HumanPlayModalProps> = ({
           </div>
 
           <div className="md:col-span-4 space-y-4 human-play-info">
+            {ghostRace && <p className="ghost-race-status" role="status" data-testid="ghost-status">{ghostCountdown > 0 ? `Race starts in ${ghostCountdown}…` : escaped ? finishMs! < ghostDuration ? 'You beat the scout!' : finishMs === ghostDuration ? 'Photo finish — draw.' : 'The scout finished first. Try again!' : ghostIndex === (ghost?.steps.length ?? 0) - 1 ? 'Scout extracted — finish your escape.' : `AI ghost: ${ghostIndex}/${ghost?.totalSteps} moves`}<small>Amber is the deterministic frontier + A* scout · {GHOST_MOVE_MS} ms/move · Independent keys and switches</small></p>}
             {/* Score Comparison Box */}
             <div className="p-4 rounded-xl bg-slate-950/90 border border-slate-800 space-y-2.5 font-mono text-xs">
               <div className="flex justify-between">
@@ -223,10 +255,11 @@ export const HumanPlayModal: React.FC<HumanPlayModalProps> = ({
             </div>
 
             {escaped && expedition?.onNextLevel && <button className="architect-btn architect-btn-primary w-full human-next-sector" data-testid="next-sector-btn" onClick={expedition.onNextLevel}>Next sector: {expedition.nextLevelName}<ArrowRight size={16} /></button>}
+            {escaped && ghostRace && <button className="architect-btn w-full human-next-sector" onClick={resetRun}>Race this ghost again</button>}
             {escaped && expedition && !expedition.onNextLevel && <p className="sector-complete" role="status"><Trophy size={16} />All {expedition.total} expedition sectors complete.</p>}
-            {escaped && onEscape && <button className={`architect-btn w-full ${expedition?.onNextLevel ? '' : 'architect-btn-primary'}`} onClick={onClose}>Continue to sector map</button>}
+            {escaped && (onEscape || onRunComplete) && <button className={`architect-btn w-full ${expedition?.onNextLevel ? '' : 'architect-btn-primary'}`} onClick={onClose}>Continue to sector map</button>}
             {/* On-Screen Tactical D-Pad */}
-            <div className="flex flex-col items-center gap-1.5 py-2 human-play-dpad">
+            {!(escaped && ghostRace) && <div className="flex flex-col items-center gap-1.5 py-2 human-play-dpad">
               <button
                 type="button"
                 aria-label="Move up"
@@ -269,7 +302,7 @@ export const HumanPlayModal: React.FC<HumanPlayModalProps> = ({
               >
                 <ArrowDown className="w-5 h-5" />
               </button>
-            </div>
+            </div>}
           </div>
         </div>
       </div>

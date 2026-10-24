@@ -9,6 +9,7 @@ import {
   Users,
 } from 'lucide-react';
 import { SECTORS } from '../../shared/sectors';
+import { COOP_SECTORS } from '../../shared/coop';
 import { MatchState } from '../../shared/types';
 
 interface LobbyScreenProps {
@@ -30,6 +31,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
   const [copiedLink, setCopiedLink] = useState(false);
   const [copyError, setCopyError] = useState('');
   const race = matchState.mode === 'RACE';
+  const coop = matchState.mode === 'COOP';
 
   const me = matchState.players.find((p) => p.token === playerToken);
   const isHost = matchState.hostToken === playerToken;
@@ -54,10 +56,10 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-800">
           <div>
             <span className="text-xs font-mono uppercase tracking-widest text-cyan-400">
-              {race ? 'LIVE ESCAPE RACE LOBBY' : 'MULTIPLAYER ARENA LOBBY'}
+              {coop ? 'CO-OP EXPEDITION LOBBY' : race ? 'LIVE ESCAPE RACE LOBBY' : 'MULTIPLAYER ARENA LOBBY'}
             </span>
             <h2 className="font-display text-2xl sm:text-3xl font-extrabold text-white mt-1">
-              {race ? 'Ready for the orbital run?' : 'Prepare your next mind game.'}
+              {coop ? 'Coordinate your escape.' : race ? 'Ready for the orbital run?' : 'Prepare your next mind game.'}
             </h2>
           </div>
 
@@ -107,8 +109,9 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
 
         <div className="mt-5"><label className="text-xs text-slate-400 block">Invite a friend on another device<input aria-label="Shareable invite URL" readOnly value={inviteUrl} onFocus={event => event.target.select()} className="mt-2 w-full p-3 rounded-lg bg-slate-950 border border-slate-700 text-cyan-200 font-mono text-xs" /></label>{copyError && <p role="status" className="architect-message">{copyError}</p>}</div>
         {race && <p className="mt-4 text-sm text-slate-300 leading-relaxed">Both players start together and race through {SECTORS.length} orbital sectors. See your rival live, use lifts and access cores, and reach the final exit first. Each exit is a checkpoint.</p>}
+        {coop && <p className="mt-4 text-sm text-slate-300 leading-relaxed">Work together through {COOP_SECTORS.length} team missions. Hold the pressure switch for your teammate, collect shared access cores and both reach extraction to advance. The server verifies every move.</p>}
         {/* Match Timer Configuration */}
-        {!race && <div className="my-6 flex flex-wrap items-center justify-between gap-4 p-4 rounded-xl bg-slate-900/80 border border-slate-800">
+        {!race && !coop && <div className="my-6 flex flex-wrap items-center justify-between gap-4 p-4 rounded-xl bg-slate-900/80 border border-slate-800">
           <div className="flex items-center gap-2.5">
             <Clock className="w-5 h-5 text-cyan-400" />
             <div>

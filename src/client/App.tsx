@@ -1,9 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { cloneGrid, computeGridStats, createEmptyGrid } from '../shared/board';
-import { Grid, MatchState, PlayerSlot, ValidationResult } from '../shared/types';
+import { Grid, MatchMode, MatchState, PlayerSlot, ValidationResult } from '../shared/types';
 import { validateBoard } from '../shared/validator';
 import { runAutonomousAgentAsync } from '../shared/agent';
 import { SHOWCASE_FACILITY } from '../shared/facility';
+import { decodeFacility } from '../shared/challenges';
+import { DailyScreen } from './components/DailyScreen';
+import { SharedFacilityScreen } from './components/SharedFacilityScreen';
 import { SectorMap } from './components/SectorMap';
 import { RaceScreen } from './components/RaceScreen';
 import { ArenaScreen } from './components/ArenaScreen';
@@ -23,6 +26,8 @@ import {
 } from './lib/socket';
 
 type AppView =
+  | 'DAILY'
+  | 'SHARED'
   | 'SECTORS'
   | 'LANDING'
   | 'SOLO_BUILD'
@@ -31,7 +36,13 @@ type AppView =
   | 'PVP';
 
 export const App: React.FC = () => {
-  const [view, setView] = useState<AppView>('LANDING');
+  const [sharedFacility] = useState<{ grid?: Grid; error?: string } | null>(() => {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('blueprint');
+    if (!code || params.has('room')) return null;
+    try { return { grid: decodeFacility(code) }; } catch (error) { return { error: (error as Error).message }; }
+  });
+  const [view, setView] = useState<AppView>(sharedFacility ? 'SHARED' : 'LANDING');
   const [playerName, setPlayerName] = useState<string>(
     () => getSavedPlayerName() || 'Architect'
   );
@@ -64,6 +75,7 @@ export const App: React.FC = () => {
       // Check URL query param `?room=CODE` or saved session room
       const params = new URLSearchParams(window.location.search);
       const urlRoom = params.get('room');
+      if (params.has('blueprint') && !urlRoom) return;
       const targetRoom = (urlRoom || getSavedRoomCode()).trim().toUpperCase();
 
       if (targetRoom) {
@@ -131,7 +143,7 @@ export const App: React.FC = () => {
     savePlayerName(name);
   };
 
-  const handleCreateLobby = (duration: 45 | 90, mode: 'ARCHITECT' | 'RACE' = 'ARCHITECT') => {
+  const handleCreateLobby = (duration: 45 | 90, mode: MatchMode = 'ARCHITECT') => {
     setLandingError(null);
     const socket = getSocket();
     setLobbyPending(true);
@@ -323,6 +335,11 @@ export const App: React.FC = () => {
   };
 
   const renderContent = () => {
+    if (view === 'DAILY') return <DailyScreen playerName={playerName} playerToken={playerToken} onChangeName={handleChangeName} onExit={handleLeaveToHome} />;
+    if (view === 'SHARED' && sharedFacility) return <SharedFacilityScreen facility={sharedFacility} onExit={handleLeaveToHome} onRemix={grid => {
+      setSoloGrid(cloneGrid(grid)); setView('SOLO_BUILD');
+      window.history.replaceState({}, '', window.location.pathname);
+    }} />;
     if (view === 'SECTORS') {
       return <SectorMap onExit={handleLeaveToHome} onOpenStudio={grid => {
         setSoloGrid(cloneGrid(grid)); setView('SOLO_BUILD');
@@ -379,7 +396,7 @@ export const App: React.FC = () => {
         );
       }
 
-      if (matchState.mode === 'RACE') {
+      if (matchState.mode === 'RACE' || matchState.mode === 'COOP') {
         return <RaceScreen match={matchState} playerToken={playerToken} connected={connected}
           onMove={(dr, dc) => getSocket().emit('race:move', { roomCode: matchState.roomCode, dr, dc })}
           onRematch={handlePvpRematch} onExit={handleLeaveToHome} />;
@@ -436,6 +453,7 @@ export const App: React.FC = () => {
         onJoinLobby={handleJoinLobby}
         onStartSolo={handleStartSolo}
         onOpenSectors={() => setView('SECTORS')}
+        onOpenDaily={() => setView('DAILY')}
         connected={connected}
         pending={lobbyPending}
         onOpenHelp={() => setHelpOpen(true)}

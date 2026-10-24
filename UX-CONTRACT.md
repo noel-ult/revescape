@@ -4,7 +4,7 @@ The user-requested scope is playable orbital levels, preserved architect PvP, li
 
 | Capability | Owner | Source of truth | Allowed variants | Verification |
 | --- | --- | --- | --- | --- |
-| Select/Listbox | Native duration select | LandingPage | Platform popup accepted | Browser lobby tests |
+| Select/Listbox | Native selects | LandingPage / BuilderScreen / DecisionRewind | Platform popup accepted | Lobby, scout selection and rewind browser tests |
 | Form | LandingPage + server acknowledgements | MatchManager | Join/create; inline errors and bounded timeout | Multiplayer browser tests |
 | Scrollbar | Global application stylesheet | DESIGN.md | Dialog/catalog geometry only | Desktop/mobile review |
 | Status | Inline role=status / role=alert | Owning screen | Blocked movement, connection, invite failure | Race and invitation tests |
@@ -18,3 +18,13 @@ Architect PvP retains its budget, server validation, scoring and existing room l
 Live races use the same fixed sector order for both players. After a common server countdown, clients send only cardinal movement intents. The server owns inventory, lift access, traps, checkpoint changes and the winner. Each player has independent inventory and switches. Portal and reset effects retain their existing semantics. Race completion is the final exit, not a client-submitted score. Spectators cannot move players.
 
 Reconnect restores the server-owned player state while the process remains alive. Leaving a lobby frees the seat and transfers host ownership. Leaving an active game disconnects that player. Matches are in memory; restarting or redeploying the single game instance loses them. The UI reports a missing saved room and allows creating another. Persistent accounts, database-backed saves and multiple game replicas are outside this deployment.
+
+## Additional challenges
+
+Campaign rewards are local and additive: prior completion remains completed with one star. A completed human trace earns par/mission stars and optional ghost victory; losing a ghost race never blocks extraction progress. Ghosts use independent deterministic traces and a shared three-second start, with no competitive model calls.
+
+Shared facilities are versioned public Grid snapshots. Full validation runs before play or remix; invalid links show an owned error and a home action. Clipboard failure retains a selectable snapshot URL. Daily play is a server-owned movement session; completed scores are written atomically to persistent application storage. Names are anonymous and self-provided; accounts and identity verification remain out of scope. UTC rollover or expired server state offers a fresh challenge, and failed persistence is reported accurately.
+
+Co-op shares recovered keys, uses occupied pressure pads for gates, and requires both teammates at extraction. Individual traps, EMP and cooldowns are preserved. Only the bound player socket can move; disconnected teammates can reconnect, and one extracted player waits for the other. This mode uses three dedicated missions with the existing Grid and movement-intent format.
+
+The solo rewind editor owns a native component select and numeric row/column inputs with inline validation. It resumes from the paused replay state, preserves original knowledge/prefix, makes a deterministic continuation and offers original restoration. Competitive scoring and controls never accept a rewind edit.

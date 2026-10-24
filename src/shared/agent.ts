@@ -171,6 +171,8 @@ export interface AgentOptions {
   visibilityRadius?: number;
   priorMemory?: AgentMemory;
   maxSteps?: number;
+  /** Local counterfactual replay only; HTTP and competitive callers never accept this option. */
+  resume?: { sourceGrid: Grid; steps: AgentSimulationStep[]; decisionEvents: AgentDecisionEvent[]; attemptNumber: number };
 }
 
 /** Only observed beliefs and public architecture leave the simulation. Never the true grid. */
@@ -208,7 +210,7 @@ function* simulateAgent(
   const visibilityRadius = options?.visibilityRadius ?? DEFAULT_VISION_RADIUS;
   const maxSteps = options?.maxSteps ?? MAX_AGENT_STEPS;
   const priorMemory = options?.priorMemory ?? createEmptyMemory();
-  const attemptNumber = priorMemory.attemptCount + 1;
+  const attemptNumber = options?.resume?.attemptNumber ?? priorMemory.attemptCount + 1;
   // Public architectural topology only. Hidden tiles remain accessible solely via observation.
   const topology = getDeckTopology(trueGrid);
 
@@ -625,8 +627,61 @@ function* simulateAgent(
     };
   };
 
-  // Initial observation at Spawn (0,0)
-  if (priorMemory.knownHazards.length > 0 || priorMemory.verifiedDecoys.length > 0) {
+  const checkpoint = options?.resume;
+  const checkpointStep = checkpoint?.steps.at(-1);
+  if (checkpoint && (!checkpointStep || checkpointStep.event === 'EXIT' || checkpointStep.row < 0 || checkpointStep.row > 7 || checkpointStep.col < 0 || checkpointStep.col > 7)) {
+    throw new Error('Choose a replay step before extraction.');
+  }
+  if (checkpoint && checkpointStep) {
+    if (JSON.stringify(getDeckTopology(checkpoint.sourceGrid)) !== JSON.stringify(topology)) throw new Error('Keep lift topology fixed when branching a replay. Redesign decks in Architect studio.');
+    // The original room is static. Restore only cells the scout had discovered,
+    // retaining its masked hazard/decoy beliefs; edits outside vision stay unknown.
+    currentPos = { row: checkpointStep.row, col: checkpointStep.col };
+    keyMask = checkpointStep.keyMask; switchMask = checkpointStep.switchMask; empRemainingTurns = checkpointStep.empRemainingTurns;
+    checkpointStep.knownHazards.forEach(key => knownHazards.add(key));
+    checkpointStep.verifiedDecoys.forEach(key => verifiedDecoys.add(key));
+    checkpointStep.triggeredResetPositions.forEach(key => disarmedHazards.add(key));
+    for (const key of checkpointStep.discoveredCells) {
+      const [row, col] = key.split(',').map(Number);
+      const tile = checkpoint.sourceGrid[row][col];
+      knownMap.set(key, (tile === 'TRAP_RESET' || tile === 'EMP_SCRAMBLER') && !knownHazards.has(key) ? 'EMPTY' :
+        tile === 'DECOY_EXIT' && !verifiedDecoys.has(key) ? 'EXIT' : tile);
+    }
+    steps.push(...checkpoint.steps.map(step => ({ ...step, plannedRoute: step.plannedRoute.map(c => ({ ...c })),
+      visibleCells: [...step.visibleCells], discoveredCells: [...step.discoveredCells], knownHazards: [...step.knownHazards],
+      verifiedDecoys: [...step.verifiedDecoys], triggeredResetPositions: [...step.triggeredResetPositions] })));
+    decisionEvents.push(...checkpoint.decisionEvents.filter(event => event.stepIndex <= checkpointStep.stepIndex).map(event => ({ ...event })));
+    for (const step of checkpoint.steps) {
+      let visited = coordKey(step.row, step.col);
+      if (step.event === 'PORTAL_WARP') {
+        const source = findPortalDestination(checkpoint.sourceGrid, step.row, step.col);
+        if (source) { visited = coordKey(source.row, source.col); usedPortalCoords.add(visited); usedPortalCoords.add(coordKey(step.row, step.col)); }
+        portalsUsedCount++;
+      }
+      if (step.event === 'TRAP_RESET_TRIGGERED') {
+        const trap = decisionEvents.find(e => e.stepIndex === step.stepIndex && e.type === 'TRAP_TRIGGERED');
+        if (trap) visited = coordKey(trap.row, trap.col);
+        trapsTriggeredCount++; trapPenaltySteps += step.stepIndex;
+      }
+      if (step.event === 'EMP_JAMMED') { trapsTriggeredCount++; empTriggeredCount++; }
+      if (step.event === 'GRAVITY_SLOW') trapPenaltySteps += 2;
+      if (step.event === 'TOGGLE_SWITCH') switchToggleCounts.set(visited, (switchToggleCounts.get(visited) ?? 0) + 1);
+      visitCounts.set(visited, (visitCounts.get(visited) ?? 0) + 1);
+      if (step.objectiveType === 'EXPLORE_FRONTIER' || step.objectiveType === 'INVESTIGATE_SIGNAL') explorationSteps++;
+      if (!step.empRemainingTurns) for (let row = 0; row < 8; row++) for (let col = 0; col < 8; col++) {
+        const tile = checkpoint.sourceGrid[row][col], key = coordKey(row, col);
+        if ((tile === 'EXIT' || tile === 'DECOY_EXIT') && manhattan(step, { row, col }) <= 5 && !knownMap.has(key) && !verifiedDecoys.has(key)) candidateSignals.set(key, { row, col });
+      }
+    }
+    decoysInvestigatedCount = decisionEvents.filter(e => e.type === 'DECOY_EXPOSED').length;
+    // Historical counters are not checkpoint state; report actual new replans
+    // from this branch rather than inventing counts for the retained prefix.
+    replanCount = 1;
+    recordDecision(checkpointStep.stepIndex, 'REPLAN', `Counterfactual branch resumed from step ${checkpointStep.stepIndex} with the scout’s existing inventory and observed beliefs.`);
+  }
+  const startIndex = checkpointStep?.stepIndex ?? 0;
+  // Initial observation at spawn, or a fresh local observation from the rewind point.
+  if (!checkpoint && (priorMemory.knownHazards.length > 0 || priorMemory.verifiedDecoys.length > 0)) {
     recordDecision(
       0,
       'MEMORY_ADAPT',
@@ -634,13 +689,13 @@ function* simulateAgent(
     );
   }
 
-  const initObs = observeEnvironment(0);
-  visitCounts.set(coordKey(currentPos.row, currentPos.col), 1);
+  const initObs = observeEnvironment(startIndex);
+  if (!checkpoint) visitCounts.set(coordKey(currentPos.row, currentPos.col), 1);
 
-  let currentPlan = (yield* selectNextObjectiveAndPlan(0));
-  recordDecision(0, 'FRONTIER', currentPlan.explanation, currentPos);
+  let currentPlan = (yield* selectNextObjectiveAndPlan(startIndex));
+  recordDecision(startIndex, 'FRONTIER', currentPlan.explanation, currentPos);
 
-  steps.push({
+  if (!checkpoint) steps.push({
     stepIndex: 0,
     row: currentPos.row,
     col: currentPos.col,
@@ -662,7 +717,7 @@ function* simulateAgent(
     decisionLog: currentPlan.explanation,
   });
 
-  for (let stepIdx = 1; stepIdx <= maxSteps; stepIdx++) {
+  for (let stepIdx = startIndex + 1; stepIdx <= maxSteps; stepIdx++) {
     if (empRemainingTurns > 0) {
       empRemainingTurns--;
     }

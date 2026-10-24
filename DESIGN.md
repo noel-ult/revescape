@@ -75,3 +75,9 @@ On phones, expedition play uses a shorter 3D viewport and puts movement status a
 Keep names, objectives, countdowns and connection state visible. Respect reduced motion. Use native buttons, accessible labels and focus indicators. Do not add decorative fake actions, claim cloud-synced campaign progress, call search-based AI machine learning, or infer public deployment from a successful local build.
 
 The home screen keeps the Reverse Escape title and live station. Mint selects exploration/build actions; warm amber distinguishes a selected live race. A three-item feature rail explains actual play options. Mode selection and lobby fields form one intentional multiplayer region. Do not return to a light concept, introduce fake dashboards, or replace the real 3D scene with a flat illustration.
+
+## Challenge interactions
+
+Ghost racing is an optional sector/shared-room action. Amber identifies the deterministic scout and a visible countdown coordinates the start; a race loss does not block campaign progression. Three stars correspond to real extraction, par and the displayed bonus mission. Reward summaries and saved ghost wins reuse mint completion styling.
+
+Studio sharing generates a public snapshot with an explicitly selectable read-only link and a clipboard fallback. Daily play has its own room, movement status, callsign and server-verified ranking sidebar; loading/error states keep retry available. Co-op uses the existing lobby and race layout with teammate language, shared access-core feedback and a clear waiting-for-partner checkpoint state. Decision rewind reuses native number fields/select, inline validation and the replay slider; it exposes deterministic continuation and original-trace restoration rather than changing submitted scores.

@@ -4,6 +4,7 @@ import { cloneGrid, computeGridStats, createEmptyGrid } from '../shared/board';
 import { calculateScore } from '../shared/scoring';
 import { solveBoardBFS } from '../shared/solver';
 import { SECTORS, Sector } from '../shared/sectors';
+import { COOP_SECTORS, moveCoop } from '../shared/coop';
 import { moveHuman, spawnHuman } from '../shared/movement';
 import { TILE_CATALOG } from '../shared/constants';
 import { Grid, MatchMode, MatchPhase, MatchState, PlayerSlot, TileType } from '../shared/types';
@@ -53,7 +54,7 @@ export class MatchManager {
   private socketToRoom = new Map<string, { roomCode: string; token: string }>();
 
   private cleanupTimer: NodeJS.Timeout;
-  constructor(io: Server, private options: { moveCooldownMs?: number; raceCountdownMs?: number; sectors?: Sector[] } = {}) {
+  constructor(io: Server, private options: { moveCooldownMs?: number; raceCountdownMs?: number; sectors?: Sector[]; coopSectors?: Sector[] } = {}) {
     this.io = io;
     this.cleanupTimer = setInterval(() => {
       for (const [code, match] of this.matches) {
@@ -114,17 +115,31 @@ export class MatchManager {
     socket.on('lobby:leave', () => this.leave(socket));
     socket.on('race:move', (payload: { roomCode?: string; dr?: number; dc?: number }) => {
       const match = this.matches.get(payload?.roomCode?.toUpperCase() ?? '');
-      if (!match || match.phase !== 'RACING' || match.mode !== 'RACE' || Date.now() < (match.raceStartedAt ?? 0)) return;
+      if (!match || match.phase !== 'RACING' || !['RACE', 'COOP'].includes(match.mode) || Date.now() < (match.raceStartedAt ?? 0)) return;
       const player = this.playerFor(socket, match);
       if (!player?.racer || player.racer.finishedAtMs !== undefined || Date.now() < (player.racer.moveReadyAt ?? 0)) return;
-      const sectors = this.options.sectors ?? SECTORS;
+      const sectors = match.mode === 'COOP' ? this.options.coopSectors ?? COOP_SECTORS : this.options.sectors ?? SECTORS;
       const sector = sectors[player.racer.stageIndex];
       if (!sector) return;
-      const result = moveHuman(sector.grid, player.racer, payload.dr!, payload.dc!);
+      const teamMove = match.mode === 'COOP' ? moveCoop(sector.grid, match.players.map(p => p.racer!), match.players.indexOf(player), payload.dr!, payload.dc!) : undefined;
+      const result = teamMove ?? moveHuman(sector.grid, player.racer, payload.dr!, payload.dc!);
       if (result.error) { socket.emit('race:blocked', { message: result.error }); return; }
+      if (teamMove) match.players.forEach((p, index) => { p.racer = { ...p.racer!, ...teamMove.players[index] }; });
       player.lastMoveAt = Date.now();
       player.racer = { ...player.racer, ...result.state, moveReadyAt: Date.now() + (this.options.moveCooldownMs ?? (result.state.lastStep.event === 'GRAVITY_SLOW' ? 450 : 150)) };
       if (result.escaped) {
+        if (match.mode === 'COOP') {
+          player.racer.finishedAtMs = Date.now() - match.raceStartedAt!;
+          if (match.players.every(p => p.racer?.finishedAtMs !== undefined)) {
+            if (player.racer.stageIndex === sectors.length - 1) {
+              match.winnerId = 'TEAM'; this.transitionToResults(match); return;
+            }
+            const nextStage = player.racer.stageIndex + 1;
+            for (const member of match.players) member.racer = { ...spawnHuman(), moves: member.racer!.moves,
+              lastStep: { ...spawnHuman().lastStep, stepIndex: member.racer!.moves }, stageIndex: nextStage };
+          }
+          this.broadcastState(match); return;
+        }
         const moves = player.racer.moves;
         if (player.racer.stageIndex === sectors.length - 1) {
           player.racer.finishedAtMs = Date.now() - match.raceStartedAt!;
@@ -170,7 +185,7 @@ export class MatchManager {
           };
 
           const match: InternalMatch = {
-            mode: payload?.mode === 'RACE' ? 'RACE' : 'ARCHITECT',
+            mode: payload?.mode === 'COOP' ? 'COOP' : payload?.mode === 'RACE' ? 'RACE' : 'ARCHITECT',
             roomCode,
             phase: 'LOBBY',
             roundNumber: 1,
@@ -308,7 +323,7 @@ export class MatchManager {
 
         if (match.players.length === 2 && match.players.every((p) => p.ready)) {
           if (match.players.every(p => p.connected)) {
-            if (match.mode === 'RACE') this.startRace(match); else this.startBuildingPhase(match);
+            if (match.mode === 'RACE' || match.mode === 'COOP') this.startRace(match); else this.startBuildingPhase(match);
           }
         }
       }
@@ -577,7 +592,7 @@ export class MatchManager {
 
   private resetForRematch(match: InternalMatch): void {
     match.roundNumber += 1;
-    if (match.mode === 'RACE') this.startRace(match); else this.startBuildingPhase(match);
+    if (match.mode === 'RACE' || match.mode === 'COOP') this.startRace(match); else this.startBuildingPhase(match);
   }
 
   private clearTimers(match: InternalMatch): void {
@@ -599,7 +614,7 @@ export class MatchManager {
       serverTime: Date.now(),
       mode: match.mode,
       raceStartedAt: match.raceStartedAt,
-      sectorIds: match.mode === 'RACE' ? (this.options.sectors ?? SECTORS).map(sector => sector.id) : undefined,
+      sectorIds: match.mode === 'COOP' ? (this.options.coopSectors ?? COOP_SECTORS).map(s => s.id) : match.mode === 'RACE' ? (this.options.sectors ?? SECTORS).map(sector => sector.id) : undefined,
       phase: match.phase,
       roundNumber: match.roundNumber,
       buildDurationSec: match.buildDurationSec,

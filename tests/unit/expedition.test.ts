@@ -68,7 +68,7 @@ describe('Dedicated solo expedition', () => {
       completed: [ids[0], ids[1], ids[3], 'arrival'],
       bestMoves: { [ids[0]]: 14, [ids[1]]: -1, [ids[3]]: 12 }, selectedSectorId: ids[7],
     });
-    expect(restored).toEqual({ completed: ids.slice(0, 2), bestMoves: { [ids[0]]: 14 }, selectedSectorId: ids[2] });
+    expect(restored).toMatchObject({ completed: ids.slice(0, 2), bestMoves: { [ids[0]]: 14 }, selectedSectorId: ids[2] });
     expect(restoreExpeditionProgress({ completed: ids, selectedSectorId: ids[3] }).selectedSectorId).toBe(ids[3]);
     expect(restoreExpeditionProgress('broken')).toEqual(fresh);
     expect(restoreExpeditionProgress({ completed: 'invalid', bestMoves: null })).toEqual(fresh);

@@ -9,8 +9,13 @@ services:
       PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:-}
       LUNA_ENABLED: ${LUNA_ENABLED:-false}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      DATA_DIR: /app/data
+    volumes:
+      - daily-data:/app/data
     expose:
       - "3001"
     stop_grace_period: 15s
     deploy:
       replicas: 1
+volumes:
+  daily-data:

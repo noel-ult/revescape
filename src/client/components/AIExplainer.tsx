@@ -7,15 +7,17 @@ interface AIExplainerProps {
   actualMoves?: number;
   compact?: boolean;
   planner?: AutonomousAgentResult['planner'];
+  continuationFrom?: number;
 }
 
 export const AIExplainer: React.FC<AIExplainerProps> = ({
-  step, optimalMoves, actualMoves, compact = false, planner,
+  step, optimalMoves, actualMoves, compact = false, planner, continuationFrom,
 }) => {
   const observation = step && 'visibleCells' in step ? step : null;
   return (
     <section className={`ai-explainer ${compact ? 'ai-explainer-compact' : ''}`} aria-label="How the AI decides">
-      <div className="ai-explainer-kicker">HOW THE SCOUT THINKS <span>{planner ? planner.modelChoices > 0 ? 'LUNA + A*' : 'LUNA REQUESTED / FALLBACK' : 'DETERMINISTIC / NO LLM'}</span></div>
+      <div className="ai-explainer-kicker">HOW THE SCOUT THINKS <span>{continuationFrom !== undefined ? 'DETERMINISTIC CONTINUATION' : planner ? planner.modelChoices > 0 ? 'LUNA + A*' : 'LUNA REQUESTED / FALLBACK' : 'DETERMINISTIC / NO LLM'}</span></div>
+      {continuationFrom !== undefined && <p className="ai-explainer-note">The original trace through step {continuationFrom} is preserved, including any earlier Luna choices. This branch continues with deterministic frontier + A* and makes no new model calls.</p>}
       <h3>{planner ? 'Luna objectives + A* routes' : 'Exploration + A* pathfinding'}</h3>
       {planner ? <p><strong>GPT-6 Luna Decisions</strong> chooses between reachable objectives using the scout’s observed map and memory. A* computes legal routes; the model cannot reveal hidden tiles or bypass lifts. When Luna is unavailable or its decision budget runs out, deterministic frontier scoring takes over. This mode uses a pretrained model; the game does not train it.</p>
         : <p>This is a <strong>search-based agent, not a trained or generative AI</strong>. It observes nearby space, chooses an unexplored frontier or useful objective, then plans the least-cost known route with A*. It replans when a lift, key, hazard, or new route changes what it knows.</p>}

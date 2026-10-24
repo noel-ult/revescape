@@ -24,6 +24,7 @@ import { PlayerSlot } from '../../shared/types';
 import { soundFX } from '../lib/sound';
 import { PuzzleGrid } from './PuzzleGrid';
 import { AIExplainer } from './AIExplainer';
+import { DecisionRewind } from './DecisionRewind';
 
 interface ArenaScreenProps {
   mode: 'SOLO' | 'PVP';
@@ -47,6 +48,7 @@ export const ArenaScreen: React.FC<ArenaScreenProps> = ({
   const [isPlaying, setIsPlaying] = useState(true);
   const [speedMultiplier, setSpeedMultiplier] = useState<0.5 | 1 | 2>(1);
   const [showHeatmap, setShowHeatmap] = useState(false);
+  const [rewindOriginal, setRewindOriginal] = useState<{ players: PlayerSlot[]; cursor: number } | null>(null);
 
   // Live Mid-Escape Firewall Sabotage state
   const [sabotageArmed, setSabotageArmed] = useState(false);
@@ -57,6 +59,7 @@ export const ArenaScreen: React.FC<ArenaScreenProps> = ({
     setPlayers(initialPlayers);
     setStepCursor(0);
     setIsPlaying(true);
+    setRewindOriginal(null);
   }, [initialPlayers]);
 
   const getActiveAgentResult = (player: PlayerSlot) => {
@@ -109,7 +112,7 @@ export const ArenaScreen: React.FC<ArenaScreenProps> = ({
   }, [isPlaying, stepCursor, maxSteps, speedMultiplier, players, attemptMode]);
 
   const handleRestart = () => {
-    setStepCursor(0);
+    setStepCursor(rewindOriginal?.cursor ?? 0);
     setIsPlaying(true);
   };
 
@@ -244,6 +247,7 @@ export const ArenaScreen: React.FC<ArenaScreenProps> = ({
             <button
               type="button"
               data-testid="attempt-1-btn"
+              disabled={Boolean(rewindOriginal)}
               aria-pressed={attemptMode === 'ATTEMPT_1'}
               onClick={() => handleSwitchAttempt('ATTEMPT_1')}
               className={`px-3 py-1.5 rounded-lg text-xs font-mono transition ${
@@ -257,6 +261,7 @@ export const ArenaScreen: React.FC<ArenaScreenProps> = ({
             <button
               type="button"
               data-testid="attempt-2-btn"
+              disabled={Boolean(rewindOriginal)}
               aria-pressed={attemptMode === 'ATTEMPT_2'}
               onClick={() => handleSwitchAttempt('ATTEMPT_2')}
               className={`px-3 py-1.5 rounded-lg text-xs font-mono flex items-center gap-1 transition ${
@@ -273,7 +278,7 @@ export const ArenaScreen: React.FC<ArenaScreenProps> = ({
           {/* Live Sabotage Charge Button */}
           {mode === 'SOLO' && <button
             type="button"
-            disabled={sabotageCharges <= 0}
+            disabled={sabotageCharges <= 0 || Boolean(rewindOriginal)}
             onClick={() => {
               setSabotageArmed((v) => !v);
               setSabotageBanner(
@@ -302,6 +307,7 @@ export const ArenaScreen: React.FC<ArenaScreenProps> = ({
             <button
               type="button"
               data-testid="clear-memory-btn"
+              disabled={Boolean(rewindOriginal)}
               onClick={() => {
                 handleSwitchAttempt('ATTEMPT_1');
                 onClearMemory?.();
@@ -392,7 +398,8 @@ export const ArenaScreen: React.FC<ArenaScreenProps> = ({
           </span>
           <input
             type="range"
-            min={0}
+            aria-label="Replay step"
+            min={rewindOriginal?.cursor ?? 0}
             max={maxSteps}
             value={stepCursor}
             onChange={(e) => {
@@ -416,6 +423,15 @@ export const ArenaScreen: React.FC<ArenaScreenProps> = ({
           <FastForward className="w-3.5 h-3.5" />
         </button>
       </div>
+
+      {mode === 'SOLO' && players[0]?.grid && getActiveAgentResult(players[0]) && <DecisionRewind grid={players[0].grid!} agent={getActiveAgentResult(players[0])!} cursor={stepCursor} paused={!isPlaying} branched={Boolean(rewindOriginal)}
+        onBranch={(grid, agentResult, solverResult) => {
+          setRewindOriginal({ players, cursor: stepCursor }); setIsPlaying(false); setSabotageArmed(false);
+          setPlayers(players.map((player, index) => index ? player : { ...player, grid, solverResult,
+            ...(attemptMode === 'ATTEMPT_2' ? { adaptedAgentResult: agentResult } : { agentResult }) }));
+        }} onRestore={() => {
+          if (rewindOriginal) { setPlayers(rewindOriginal.players); setStepCursor(rewindOriginal.cursor); setIsPlaying(false); setRewindOriginal(null); }
+        }} />}
 
       {/* Side-by-Side Escape Boards + Decision Logs */}
       <div
@@ -450,7 +466,7 @@ export const ArenaScreen: React.FC<ArenaScreenProps> = ({
           const stepsSavedByMemory = Math.max(0, attempt1Steps - attempt2Steps);
 
           const visibleDecisions = (agentRes?.decisionEvents ?? []).filter(
-            (ev) => ev.stepIndex <= clampedIdx
+            (ev) => ev.stepIndex <= (currentStep?.stepIndex ?? clampedIdx)
           );
 
           return (
@@ -516,6 +532,7 @@ export const ArenaScreen: React.FC<ArenaScreenProps> = ({
                 {/* AI Knowledge State & Observable Decision Feed */}
                 <div className="flex-1 w-full space-y-3">
                   <AIExplainer step={currentStep} optimalMoves={player.solverResult?.shortestPathLength}
+                    continuationFrom={rewindOriginal ? getActiveAgentResult(rewindOriginal.players[playerIdx])?.steps[rewindOriginal.cursor]?.stepIndex : undefined}
                     actualMoves={agentRes?.totalSteps} planner={agentRes?.planner} compact />
                   <div className="grid grid-cols-2 gap-2 text-xs font-mono">
                     <div className="p-2.5 rounded-xl bg-slate-950/90 border border-slate-800">
@@ -533,7 +550,7 @@ export const ArenaScreen: React.FC<ArenaScreenProps> = ({
 
                     <div className="p-2.5 rounded-xl bg-slate-950/90 border border-slate-800">
                       <div className="text-[10px] text-slate-400 mb-1">
-                        A* REPLANS
+                        {rewindOriginal ? 'CONTINUATION REPLANS' : 'A* REPLANS'}
                       </div>
                       <div className="text-purple-300 font-bold">
                         {agentRes?.replanCount ?? 0} replans

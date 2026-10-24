@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowRight, ArrowUpRight, Box, Users, Flag, Layers, BrainCircuit, Radio, Compass, Swords } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, Box, Users, Flag, Layers, BrainCircuit, Radio, Compass, Swords, Handshake, CalendarDays } from 'lucide-react';
+import type { MatchMode } from '../../shared/types';
 import { SHOWCASE_FACILITY } from '../../shared/facility';
 import { runAutonomousAgent } from '../../shared/agent';
 import { PuzzleGrid } from './PuzzleGrid';
@@ -7,7 +8,8 @@ import { PuzzleGrid } from './PuzzleGrid';
 interface LandingPageProps {
   playerName: string;
   onChangePlayerName: (name: string) => void;
-  onCreateLobby: (duration: 45 | 90, mode?: 'ARCHITECT' | 'RACE') => void;
+  onCreateLobby: (duration: 45 | 90, mode?: MatchMode) => void;
+  onOpenDaily: () => void;
   onOpenSectors: () => void;
   connected: boolean;
   pending?: boolean;
@@ -18,10 +20,10 @@ interface LandingPageProps {
 }
 
 export const LandingPage: React.FC<LandingPageProps> = ({
-  playerName, onChangePlayerName, onCreateLobby, onJoinLobby, onStartSolo, onOpenHelp, onOpenSectors, connected, pending, errorMessage,
+  playerName, onChangePlayerName, onCreateLobby, onJoinLobby, onStartSolo, onOpenHelp, onOpenSectors, onOpenDaily, connected, pending, errorMessage,
 }) => {
   const [joinCode, setJoinCode] = useState('');
-  const [mode, setMode] = useState<'ARCHITECT' | 'RACE'>('ARCHITECT');
+  const [mode, setMode] = useState<MatchMode>('ARCHITECT');
   const [duration, setDuration] = useState<45 | 90>(90);
   const demonstration = useMemo(() => runAutonomousAgent(SHOWCASE_FACILITY), []);
   const [frame, setFrame] = useState(0);
@@ -45,6 +47,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             <button className="architect-btn" data-testid="solo-challenge-btn" onClick={onStartSolo}>Architect studio <ArrowRight size={17} /></button>
           </div>
           <p className="solo-expedition-hint">8 single-player levels · escape each sector to unlock the next</p>
+          <button className="facility-home-help" data-testid="daily-challenge-btn" onClick={onOpenDaily}><CalendarDays size={14} />Play today’s daily challenge <span>Verified rankings ↗</span></button>
           <button className="facility-home-help" onClick={onOpenHelp}>New to Mind Wars? <span>See how it works ↗</span></button>
         </div>
         <div className="facility-home-scene">
@@ -63,6 +66,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           <div className="multiplayer-mode" role="group" aria-label="Multiplayer mode">
             <button aria-pressed={mode === 'ARCHITECT'} onClick={() => setMode('ARCHITECT')}><span className="mode-symbol"><Box size={23} /></span><span><strong>Architect duel</strong><small>Build rooms. Challenge the AI.</small></span><i /></button>
             <button data-testid="race-mode-btn" aria-pressed={mode === 'RACE'} onClick={() => setMode('RACE')}><span className="mode-symbol"><Flag size={23} /></span><span><strong>Live escape race</strong><small>Two players. Eight orbital levels.</small></span><i /></button>
+            <button data-testid="coop-mode-btn" aria-pressed={mode === 'COOP'} onClick={() => setMode('COOP')}><span className="mode-symbol"><Handshake size={23} /></span><span><strong>Co-op expedition</strong><small>Hold switches. Share cores. Escape together.</small></span><i /></button>
           </div>
           <div className="home-lobby-fields">
             <div className="facility-home-match-form">

@@ -1,5 +1,6 @@
 import { parseShorthandGrid } from './board';
 import type { Sector } from './sectors';
+import type { ExpeditionReward } from './challenges';
 
 export interface ExpeditionSector extends Sector {
   difficulty: 'Training' | 'Standard' | 'Advanced' | 'Finale';
@@ -142,6 +143,7 @@ export interface ExpeditionProgress {
   completed: string[];
   bestMoves: Record<string, number>;
   selectedSectorId: string;
+  rewards?: Record<string, ExpeditionReward>;
 }
 
 export const EXPEDITION_STORAGE_KEY = 'reverse-escape-solo-expedition-v2';
@@ -167,5 +169,11 @@ export function restoreExpeditionProgress(value: unknown): ExpeditionProgress {
   const index = EXPEDITION_SECTORS.findIndex(sector => sector.id === saved.selectedSectorId);
   const selectedSectorId = isExpeditionUnlocked(completed, index) ? EXPEDITION_SECTORS[index].id :
     EXPEDITION_SECTORS[Math.min(completed.length, EXPEDITION_SECTORS.length - 1)].id;
-  return { completed, bestMoves, selectedSectorId };
+  const rewards: Record<string, ExpeditionReward> = {};
+  for (const id of completed) {
+    const reward = saved.rewards?.[id];
+    rewards[id] = { stars: Number.isInteger(reward?.stars) && reward!.stars >= 1 && reward!.stars <= 3 ? reward!.stars : 1,
+      bonus: reward?.bonus === true, ghostWon: reward?.ghostWon === true };
+  }
+  return { completed, bestMoves, selectedSectorId, ...(Object.keys(rewards).length ? { rewards } : {}) };
 }

@@ -9,6 +9,7 @@ import { soundFX } from '../lib/sound';
 import { HumanPlayModal } from './HumanPlayModal';
 import { PuzzleGrid } from './PuzzleGrid';
 import { AIExplainer } from './AIExplainer';
+import { FacilityShare } from './FacilityShare';
 import { getDeckTopology, validDeckAccess } from '../../shared/levels';
 
 interface BuilderScreenProps {
@@ -255,6 +256,7 @@ export const BuilderScreen: React.FC<BuilderScreenProps> = ({
               </button>
             </div>
           </div>
+          {mode === 'SOLO' && <FacilityShare grid={grid} valid={validation.valid} />}
           {(message || serverErrors.length > 0) && <p className="architect-message" role="status">{message || serverErrors.join(' ')}</p>}
           {activeStep && <div className="architect-status" role="status"><span>SCOUT 01 / STEP {testIndex}</span><small>{activeStep.decisionLog}</small></div>}
           {!activeStep && <div className={`architect-status ${validation.valid ? '' : 'invalid'}`} data-testid="validation-status-box">

@@ -228,7 +228,7 @@ export type MatchPhase =
   | 'RESULTS'
   | 'RACING';
 
-export type MatchMode = 'ARCHITECT' | 'RACE';
+export type MatchMode = 'ARCHITECT' | 'RACE' | 'COOP';
 export interface RacerState {
   empRemainingTurns?: number;
   moveReadyAt?: number;

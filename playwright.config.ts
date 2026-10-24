@@ -25,7 +25,7 @@ export default defineConfig({
   webServer: {
     command: 'npm run start',
     url: `http://localhost:${port}/api/health`,
-    env: { PORT: port, NODE_ENV: 'production', LUNA_ENABLED: 'false', OPENAI_API_KEY: '' },
+    env: { PORT: port, NODE_ENV: 'production', LUNA_ENABLED: 'false', OPENAI_API_KEY: '', DATA_DIR: `/tmp/revescape-e2e-daily-${port}` },
     reuseExistingServer: !process.env.CI,
     timeout: 30000,
   },

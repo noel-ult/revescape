@@ -9,6 +9,7 @@ import { solveBoardBFS } from '../../shared/solver';
 import { runAutonomousAgent } from '../../shared/agent';
 import { PuzzleGrid } from './PuzzleGrid';
 import { HumanPlayModal } from './HumanPlayModal';
+import { expeditionBonus, scoreExpeditionRun, ExpeditionRunReport } from '../../shared/challenges';
 
 function loadProgress(): ExpeditionProgress {
   try { return restoreExpeditionProgress(JSON.parse(localStorage.getItem(EXPEDITION_STORAGE_KEY) ?? 'null')); }
@@ -18,6 +19,7 @@ function loadProgress(): ExpeditionProgress {
 export function SectorMap({ onExit, onOpenStudio }: { onExit: () => void; onOpenStudio: (grid: Grid) => void }) {
   const [progress, setProgress] = useState(loadProgress);
   const [playing, setPlaying] = useState(false);
+  const [ghostRace, setGhostRace] = useState(false);
   const [message, setMessage] = useState('');
   const { completed, bestMoves } = progress;
   const selected = EXPEDITION_SECTORS.findIndex(entry => entry.id === progress.selectedSectorId);
@@ -38,11 +40,17 @@ export function SectorMap({ onExit, onOpenStudio }: { onExit: () => void; onOpen
     setProgress(previous => ({ ...previous, selectedSectorId: id }));
     setMessage('');
   };
-  const complete = (moves: number) => {
+  const complete = (report: ExpeditionRunReport) => {
+    const reward = scoreExpeditionRun(sector.id, report, metrics.fog);
     setProgress(previous => ({
       ...previous,
       completed: Array.from(new Set([...previous.completed, sector.id])),
-      bestMoves: { ...previous.bestMoves, [sector.id]: Math.min(previous.bestMoves[sector.id] ?? Infinity, moves) },
+      bestMoves: { ...previous.bestMoves, [sector.id]: Math.min(previous.bestMoves[sector.id] ?? Infinity, report.moves) },
+      rewards: { ...previous.rewards, [sector.id]: {
+        stars: Math.max(previous.rewards?.[sector.id]?.stars ?? 0, reward.stars),
+        bonus: Boolean(previous.rewards?.[sector.id]?.bonus || reward.bonus),
+        ghostWon: Boolean(previous.rewards?.[sector.id]?.ghostWon || reward.ghostWon),
+      } },
     }));
   };
   const continueToNext = () => {
@@ -65,9 +73,11 @@ export function SectorMap({ onExit, onOpenStudio }: { onExit: () => void; onOpen
         <span className="architect-eyebrow">Sector {String(selected + 1).padStart(2, '0')} / {sector.difficulty}</span>
         <h2>{sector.name}</h2><p>{sector.objective}</p>
         <div className="sector-detail-metrics"><span><small>OPTIMAL ROUTE</small>{metrics.optimal} moves</span><span><small>SCOUT BENCHMARK</small>{metrics.fog} moves</span></div>
-        <button className="architect-btn architect-btn-primary" data-testid="enter-sector-btn" onClick={() => setPlaying(true)}>{completed.includes(sector.id) ? 'Replay sector' : 'Enter level'}<ArrowRight size={16} /></button>
+        <button className="architect-btn architect-btn-primary" data-testid="enter-sector-btn" onClick={() => { setGhostRace(false); setPlaying(true); }}>{completed.includes(sector.id) ? 'Replay sector' : 'Enter level'}<ArrowRight size={16} /></button>
+        <button className="architect-btn" data-testid="ghost-race-btn" onClick={() => { setGhostRace(true); setPlaying(true); }}>Race the AI ghost</button>
         <button className="architect-btn" onClick={() => onOpenStudio(sector.grid)}>Remix in architect studio</button>
         <p className="sector-detail-note"><strong>{sector.mechanic}.</strong> {sector.hint}</p>
+        <div className="expedition-missions"><strong aria-label={`${progress.rewards?.[sector.id]?.stars ?? 0} of 3 stars`}>{'★'.repeat(progress.rewards?.[sector.id]?.stars ?? 0)}{'☆'.repeat(3 - (progress.rewards?.[sector.id]?.stars ?? 0))}</strong><p>★ Reach extraction</p><p>★ Finish in {metrics.fog} moves or fewer</p><p>★ {expeditionBonus(sector.id)}</p>{progress.rewards?.[sector.id]?.ghostWon && <p>AI ghost race won ✓</p>}</div>
         {completed.includes(sector.id) && <p className="sector-complete"><Check size={16} />{bestMoves[sector.id] ? `Best: ${bestMoves[sector.id]} moves` : 'Sector complete'}{nextSector ? ' · next platform unlocked' : ' · expedition complete'}</p>}
       </aside>
     </div>
@@ -75,11 +85,11 @@ export function SectorMap({ onExit, onOpenStudio }: { onExit: () => void; onOpen
     <div className="sector-list" aria-label="Solo expedition levels">
       {EXPEDITION_SECTORS.map((entry, index) => <button key={entry.id} data-testid={`sector-${entry.id}`} aria-pressed={selected === index} aria-disabled={!unlocked(index)} disabled={!unlocked(index)} className={`sector-card ${selected === index ? 'selected' : ''} ${unlocked(index) ? '' : 'locked'}`} onClick={() => select(entry.id)} style={{ '--sector-color': entry.color } as React.CSSProperties}>
         <span className="sector-card-index">{String(index + 1).padStart(2, '0')}{completed.includes(entry.id) ? <Check size={17} /> : unlocked(index) ? <MapPin size={17} /> : <Lock size={16} />}</span>
-        <strong>{entry.name}</strong><small>{entry.mechanic}</small><span>{completed.includes(entry.id) ? `COMPLETED${bestMoves[entry.id] ? ` · BEST ${bestMoves[entry.id]} MOVES` : ''}` : unlocked(index) ? 'READY TO EXPLORE' : 'COMPLETE PREVIOUS SECTOR'}</span>
+        <strong>{entry.name}</strong><small>{entry.mechanic}</small><span>{completed.includes(entry.id) ? `COMPLETED${bestMoves[entry.id] ? ` · BEST ${bestMoves[entry.id]} MOVES` : ''} · ${progress.rewards?.[entry.id]?.stars ?? 1}/3 ★` : unlocked(index) ? 'READY TO EXPLORE' : 'COMPLETE PREVIOUS SECTOR'}</span>
       </button>)}
     </div>
     <HumanPlayModal key={sector.id} open={playing} title={sector.name} grid={sector.grid} theme={sector.theme} sectors={EXPEDITION_SECTORS}
-      aiOptimalMoves={metrics.optimal} aiFogMoves={metrics.fog} onEscape={complete} onClose={() => setPlaying(false)}
+      aiOptimalMoves={metrics.optimal} aiFogMoves={metrics.fog} onRunComplete={complete} onClose={() => setPlaying(false)} ghostRace={ghostRace}
       expedition={{ stage: selected + 1, total: EXPEDITION_SECTORS.length, nextLevelName: nextSector?.name, onNextLevel: nextSector ? continueToNext : undefined }} />
   </div>;
 }

@@ -13,6 +13,7 @@ Deploy this repository as **one Node application**, serving the built game, HTTP
    NODE_ENV=production
    PORT=3001
    PUBLIC_ORIGIN=https://your-game-domain.example
+   DATA_DIR=/app/data
    ```
 
    Replace the example with the exact browser origin, without a trailing slash. The origin check applies to WebSocket handshakes as well as HTTP polling. Do not put reconnect tokens or secrets into frontend environment variables.
@@ -95,3 +96,11 @@ This application's production HTTP service listens on `PORT`, default **3001**. 
 If it still fails, inspect application logs for `Listening on port 3001`, confirm the container health check is passing, then inspect the Traefik service/network route. Avoid changing TLS/DNS blindly when Cloudflare already reports an origin-side error. See [Cloudflare's 502 troubleshooting](https://developers.cloudflare.com/support/troubleshooting/http-status-codes/cloudflare-5xx-errors/error-502-504/).
 
 On 2026-10-25 (Asia/Kolkata), the live `revescape.noelbiju.in` route was observed pointing at 3000. Changing its Dokploy domain Container Port to 3001 restored HTTP 200 health and passed the public two-client WebSocket race/movement smoke test. This observation verifies that deployment revision's routing; it does not verify live Luna access or future releases.
+
+## Persistent daily rankings
+
+A Dockerfile application must mount a named volume at `/app/data`, matching `DATA_DIR`. In Dokploy choose **Advanced → Volumes → Add Volume → Volume Mount**, use volume name `revescape-daily-data` and mount path `/app/data`, then deploy the new image. Dokploy’s `g`, then `a` shortcut opens Advanced if the tab is outside the visible tab strip. The runtime image creates this directory for the unprivileged `node` user. The volume must remain writable by that user. The Compose service already provides `daily-data:/app/data`.
+
+The application mount has been configured in the current Dokploy project. After deploying, complete an actual daily run and verify its result is saved. Keep named volumes when replacing containers; include them in backups. The official [Dokploy storage documentation](https://docs.dokploy.com/docs/core/applications/advanced) describes named mounts.
+
+Daily scores are atomically stored in `daily-scores.json`; credentials are hashed, and only public callsigns, verified move counts and timestamps appear in rankings. Keep `data/` excluded from Git and Docker build contexts. A damaged existing file is not overwritten automatically. Disk/permission failures leave gameplay available and explicitly report the ranking as unsaved. Active daily runs and co-op/race rooms remain transient and must be restarted after deployment. Use one replica for both movement state and the local score file.
