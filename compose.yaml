@@ -1,0 +1,14 @@
+services:
+  game:
+    build: .
+    restart: unless-stopped
+    init: true
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:-}
+    expose:
+      - "3001"
+    stop_grace_period: 15s
+    deploy:
+      replicas: 1

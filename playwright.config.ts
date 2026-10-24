@@ -1,5 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const port = process.env.E2E_PORT || '3001';
+
 export default defineConfig({
   testDir: './tests/e2e',
   timeout: 60000,
@@ -10,7 +12,7 @@ export default defineConfig({
   workers: 1,
   reporter: 'list',
   use: {
-    baseURL: 'http://localhost:3001',
+    baseURL: `http://localhost:${port}`,
     trace: 'on-first-retry',
     launchOptions: { args: ['--enable-unsafe-swiftshader'] },
   },
@@ -22,7 +24,8 @@ export default defineConfig({
   ],
   webServer: {
     command: 'npm run start',
-    url: 'http://localhost:3001/api/health',
+    url: `http://localhost:${port}/api/health`,
+    env: { PORT: port, NODE_ENV: 'production' },
     reuseExistingServer: !process.env.CI,
     timeout: 30000,
   },

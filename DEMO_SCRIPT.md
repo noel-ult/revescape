@@ -37,3 +37,12 @@ Show the results and choose **Try escaping…** to enter the facility yourself w
 The demo requires no paid API or LLM service. If a device cannot render WebGL, the blueprint fallback keeps the game playable.
 
 If asked about scope: the annexes reuse eight sectors of the existing 8×8 grid; they are not arbitrary stacked floors. Their lift components activate the raised geometry and legal access. Other distant towers are decorative. Competitive simulation and scoring remain server-authoritative. Present the local or LAN session only; a GitHub source repository is not a public game deployment.
+
+
+## Orbital levels and live human race variant
+
+Open **Explore the orbital levels**. Rotate the map and point out that every outer platform is now a named destination with a miniature of its real room. Enter Arrival dock, move to extraction with WASD/arrows or the D-pad, then return to show Wormhole terminal unlocked. Progress is stored on this browser.
+
+For a live multiplayer demo, open two browsers/devices on the same deployed HTTPS URL. Choose **Live escape race**, create a room, share its invite URL, and ready both players. Show the common three-second start, the amber rival moving on the same deck, and one player extracting into the next sector while the other remains behind. Refresh the leading player's page to demonstrate state recovery. The server validates movements and checkpoints; the first final extraction wins. Architect duel remains a separate selectable mode.
+
+Deployment is through the user's Dokploy instance using the repository Dockerfile and port 3001. Follow DEPLOYMENT.md; do not claim a public deployment until its URL and WebSocket checks have been verified.

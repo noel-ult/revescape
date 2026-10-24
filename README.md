@@ -33,6 +33,19 @@ Lift topology is public architecture, but annex contents remain under partial ob
 
 ---
 
+## Orbital expedition and live multiplayer
+
+The surrounding platforms now represent **eight playable sectors**, each with its own layout and objective: Arrival dock, Wormhole terminal, Aerial research wing, Cryogenic reactor, Mirage observatory, Chromatic vault, Skybridge complex, and Orbital command. Open **Explore the orbital levels** to choose a platform in the 3D sector map or its accessible card list. Escape a level yourself to unlock the next one; completion is saved on this browser/device. Watching the scout or remixing a room does not complete the human challenge. These are separate rooms connected by extraction checkpoints, alongside the two walkable raised annexes within a room.
+
+Multiplayer has two modes:
+
+- **Architect duel:** the existing budgeted construction competition, with server-validated rooms, AI attempts, scores and rematches.
+- **Live escape race:** both players start after one server countdown and race through the same eight sectors. Cyan is your scout; amber is the rival when both are in the same sector. WASD, arrows and on-screen touch buttons send movement intentions; the server handles keys, switches, mines, lift transitions, checkpoints and the first-to-finish winner. Player inventories and switch states are independent. EMP fields narrow human sensors for six moves; cryo coolant delays the next move. The inventory panel shows collected access cores and phase polarity.
+
+Invite URLs join a room across devices. Refresh/reconnect restores server-owned progress while the server remains running. Spectators can watch but cannot move either player. Opponent session tokens are private. Leaving a lobby frees the slot and transfers host ownership if necessary.
+
+For **Dokploy**, use the root Dockerfile as a single Application, route your HTTPS domain to container port **3001**, and keep one replica. The full setup, operational limits and live WebSocket smoke check are in [DEPLOYMENT.md](DEPLOYMENT.md). Production runs compiled JavaScript with development dependencies removed.
+
 ## Quick Start (Local Development & Production)
 
 ### 1. Install Dependencies
@@ -65,6 +78,7 @@ Runs Vitest unit & Socket.IO integration tests covering:
 - Legal lift placement, blocked cross-deck BFS/A* shortcuts, elevation costs, and deterministic visits to both starter annexes (`tests/unit/levels.test.ts`)
 - Complete-information state-space BFS validation (`tests/unit/solver.test.ts`, `tests/unit/validator.test.ts`)
 - Mind Wars bounded scoring formula (`tests/unit/scoring.test.ts`)
+- Eight validated sector layouts, shared human movement, authoritative race checkpoints/winner/reconnect/rematch, and spectator/host permission boundaries (`tests/unit/sectors.test.ts`, `tests/unit/race.test.ts`)
 - Real-time 2-player Socket.IO multiplayer lifecycle (`tests/unit/multiplayer.test.ts`)
 - Atomic module placement, rotation, caps, anchors, budget, and the starter station's actual portal/key/door sequence (`tests/unit/validator.test.ts`)
 
@@ -74,7 +88,7 @@ npm run build
 npm run test:e2e
 ```
 
-Browser tests cover 3D placement (including grid seams and both raised surfaces), save/restore, undo/redo, interpolated lift movement, follow camera, manual lift entry/return and blocked edges, desktop/mobile layouts, solo results, and a complete two-browser PvP match/rematch. The test configuration enables Chromium's software WebGL renderer for machines without an available GPU.
+Browser tests cover 3D placement (including grid seams and both raised surfaces), save/restore, undo/redo, interpolated lift movement, follow camera, manual lift entry/return and blocked edges, desktop/mobile layouts, solo results, a complete two-browser architect match/rematch, solo sector unlocks, 3D destination picking, expired invites, and a live desktop-versus-touch-mobile race with checkpoint/reconnect recovery. The test configuration enables Chromium's software WebGL renderer for machines without an available GPU.
 
 For two devices on the same network, run the production server and open `http://<server-LAN-IP>:3001` on both devices. For hosting, use a Node service with `npm install`, `npm run build`, and `npm start`; set `PORT` to the host's assigned port. Forward WebSocket upgrades for `/socket.io/` and use `/api/health` for health checks. Keep one Node instance unless match storage is moved to a shared service. Matches live in memory and are lost on restart. No public deployment is included in the local setup.
 
