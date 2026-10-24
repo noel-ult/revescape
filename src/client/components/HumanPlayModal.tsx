@@ -1,3 +1,5 @@
+import { createPortal } from 'react-dom';
+import { useGameDialog } from '../lib/useGameDialog';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ArrowDown,
@@ -47,23 +49,7 @@ export const HumanPlayModal: React.FC<HumanPlayModalProps> = ({
   const [empTurns, setEmpTurns] = useState(0);
   const [escaped, setEscaped] = useState(false);
   const lastMoveAt = useRef(0);
-  const dialogRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const previous = document.activeElement as HTMLElement | null;
-    const overflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    const frame = requestAnimationFrame(() => dialogRef.current?.querySelector<HTMLButtonElement>('button')?.focus());
-    const trap = (event: KeyboardEvent) => {
-      if (event.key !== 'Tab') return;
-      const controls = Array.from(dialogRef.current?.querySelectorAll<HTMLElement>('button:not(:disabled), [tabindex="0"]') ?? []);
-      const first = controls[0], last = controls.at(-1);
-      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
-      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
-    };
-    document.addEventListener('keydown', trap);
-    return () => { cancelAnimationFrame(frame); document.removeEventListener('keydown', trap); document.body.style.overflow = overflow; if (previous?.isConnected) previous.focus(); };
-  }, [open]);
+  const dialogRef = useGameDialog(open, onClose);
 
   const resetRun = useCallback(() => {
     setPos({ ...START_POS });
@@ -123,7 +109,6 @@ export const HumanPlayModal: React.FC<HumanPlayModalProps> = ({
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { onClose(); return; }
       if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') {
         e.preventDefault();
         moveDelta(-1, 0);
@@ -148,8 +133,8 @@ export const HumanPlayModal: React.FC<HumanPlayModalProps> = ({
   const currentStep = latestStep ? humanViewStep(grid, { ...pos, keyMask, switchMask, spentTraps: [...spentTraps], moves: history.length - 1, empRemainingTurns: empTurns, lastStep: latestStep }) : null;
   const humanMoves = Math.max(0, history.length - 1);
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
+  return createPortal(
+    <div className="human-exploration-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
       <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={title} className="cyber-card max-w-6xl w-full rounded-2xl p-6 border border-cyan-400/50 max-h-[92vh] overflow-y-auto">
         <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-800">
           <div className="flex items-center gap-2.5">
@@ -272,6 +257,6 @@ export const HumanPlayModal: React.FC<HumanPlayModalProps> = ({
           </div>
         </div>
       </div>
-    </div>
+    </div>, document.body
   );
 };

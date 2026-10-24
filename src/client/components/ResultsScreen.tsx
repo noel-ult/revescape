@@ -37,12 +37,15 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({
     try {
       confetti({
         particleCount: 70,
+        disableForReducedMotion: true,
+        colors: ['#9ef6d8', '#ffb47f', '#99bcff'],
         spread: 65,
         origin: { y: 0.6 },
       });
     } catch {
-      // ignore in headless test environments
+      // Animation is optional when the canvas is unavailable.
     }
+    return () => { confetti.reset(); };
   }, []);
 
   const winnerPlayer =
@@ -51,7 +54,7 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({
       : null;
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-8">
+    <div className="game-screen results-screen max-w-6xl mx-auto px-4 py-8">
       {/* Winner Banner */}
       <div
         data-testid="results-banner"

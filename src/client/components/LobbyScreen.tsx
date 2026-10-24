@@ -49,15 +49,15 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
   const handleCopyLink = () => { void copy(inviteUrl, true); };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8">
-      <div className="cyber-card rounded-2xl p-6 sm:p-8 border border-cyan-500/35">
+    <div className="game-screen lobby-screen max-w-5xl mx-auto px-4 py-8">
+      <div className="cyber-card lobby-room rounded-2xl p-6 sm:p-8 border border-cyan-500/35">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-800">
           <div>
             <span className="text-xs font-mono uppercase tracking-widest text-cyan-400">
               {race ? 'LIVE ESCAPE RACE LOBBY' : 'MULTIPLAYER ARENA LOBBY'}
             </span>
             <h2 className="font-display text-2xl sm:text-3xl font-extrabold text-white mt-1">
-              Awaiting Architects
+              {race ? 'Ready for the orbital run?' : 'Prepare your next mind game.'}
             </h2>
           </div>
 

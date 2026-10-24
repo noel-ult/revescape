@@ -205,7 +205,7 @@ test.describe('Reverse Escape — Humans vs AI E2E Verification', () => {
     await page.getByRole('button', { name: 'top camera' }).click();
     await expect(page.getByTestId('sector-transit')).toBeDisabled();
     await clickOrbitalPlatform(page, 1);
-    await expect(page.getByRole('status')).toContainText('Complete Arrival dock');
+    await expect(page.getByRole('status').filter({ hasText: 'Complete Arrival dock' })).toBeVisible();
     await page.getByTestId('enter-sector-btn').click();
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible();

@@ -183,7 +183,7 @@ export const ArenaScreen: React.FC<ArenaScreenProps> = ({
   };
 
   return (
-    <div className="max-w-[1600px] mx-auto px-4 py-6">
+    <div className="game-screen arena-screen max-w-[1600px] mx-auto px-4 py-6">
       {/* Arena Header & Controls */}
       <div className="cyber-card rounded-2xl p-4 sm:p-5 mb-5 flex flex-wrap items-center justify-between gap-4 border border-cyan-400/40">
         <div className="flex items-center gap-3">
@@ -210,6 +210,7 @@ export const ArenaScreen: React.FC<ArenaScreenProps> = ({
             <button
               type="button"
               data-testid="view-mode-ai-btn"
+              aria-pressed={viewMode === 'AI_FOG'}
               onClick={() => setViewMode('AI_FOG')}
               className={`px-3 py-1.5 rounded-lg text-xs font-mono flex items-center gap-1.5 transition ${
                 viewMode === 'AI_FOG'
@@ -223,6 +224,7 @@ export const ArenaScreen: React.FC<ArenaScreenProps> = ({
             <button
               type="button"
               data-testid="view-mode-world-btn"
+              aria-pressed={viewMode === 'WORLD'}
               onClick={() => setViewMode('WORLD')}
               className={`px-3 py-1.5 rounded-lg text-xs font-mono flex items-center gap-1.5 transition ${
                 viewMode === 'WORLD'
@@ -240,6 +242,7 @@ export const ArenaScreen: React.FC<ArenaScreenProps> = ({
             <button
               type="button"
               data-testid="attempt-1-btn"
+              aria-pressed={attemptMode === 'ATTEMPT_1'}
               onClick={() => handleSwitchAttempt('ATTEMPT_1')}
               className={`px-3 py-1.5 rounded-lg text-xs font-mono transition ${
                 attemptMode === 'ATTEMPT_1'
@@ -252,6 +255,7 @@ export const ArenaScreen: React.FC<ArenaScreenProps> = ({
             <button
               type="button"
               data-testid="attempt-2-btn"
+              aria-pressed={attemptMode === 'ATTEMPT_2'}
               onClick={() => handleSwitchAttempt('ATTEMPT_2')}
               className={`px-3 py-1.5 rounded-lg text-xs font-mono flex items-center gap-1 transition ${
                 attemptMode === 'ATTEMPT_2'

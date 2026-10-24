@@ -41,7 +41,7 @@ If asked about scope: the annexes reuse eight sectors of the existing 8×8 grid;
 
 ## Orbital levels and live human race variant
 
-Open **Explore the orbital levels**. Rotate the map and point out that every outer platform is now a named destination with a miniature of its real room. Enter Arrival dock, move to extraction with WASD/arrows or the D-pad, then return to show Wormhole terminal unlocked. Progress is stored on this browser.
+Open **Explore levels**. Rotate the map and point out that every outer platform is now a named destination with a miniature of its real room. Enter Arrival dock, move to extraction with WASD/arrows or the D-pad, then return to show Wormhole terminal unlocked. Progress is stored on this browser.
 
 For a live multiplayer demo, open two browsers/devices on the same deployed HTTPS URL. Choose **Live escape race**, create a room, share its invite URL, and ready both players. Show the common three-second start, the amber rival moving on the same deck, and one player extracting into the next sector while the other remains behind. Refresh the leading player's page to demonstrate state recovery. The server validates movements and checkpoints; the first final extraction wins. Architect duel remains a separate selectable mode.
 

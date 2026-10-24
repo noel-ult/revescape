@@ -8,7 +8,7 @@ The user-requested scope is playable orbital levels, preserved architect PvP, li
 | Form | LandingPage + server acknowledgements | MatchManager | Join/create; inline errors and bounded timeout | Multiplayer browser tests |
 | Scrollbar | Global application stylesheet | DESIGN.md | Dialog/catalog geometry only | Desktop/mobile review |
 | Status | Inline role=status / role=alert | Owning screen | Blocked movement, connection, invite failure | Race and invitation tests |
-| Dialog | HumanPlayModal | Shared human movement | Solo exploration / campaign completion | Keyboard, escape, focus return |
+| Dialog | useGameDialog + body portal | HumanPlayModal / HowToPlayModal | Exploration / campaign / guide | Keyboard, Escape, focus return, inert background |
 | 3D input | FacilityView + FacilityScene | Shared topology + sector catalog | Cell editing / sector selection | Pointer and raised-deck browser tests |
 
 Solo campaign completion is device-local and only recorded after reaching the sector exit. It unlocks the following destination. Remixing or watching an AI run does not complete a human level.

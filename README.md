@@ -35,7 +35,7 @@ Lift topology is public architecture, but annex contents remain under partial ob
 
 ## Orbital expedition and live multiplayer
 
-The surrounding platforms now represent **eight playable sectors**, each with its own layout and objective: Arrival dock, Wormhole terminal, Aerial research wing, Cryogenic reactor, Mirage observatory, Chromatic vault, Skybridge complex, and Orbital command. Open **Explore the orbital levels** to choose a platform in the 3D sector map or its accessible card list. Escape a level yourself to unlock the next one; completion is saved on this browser/device. Watching the scout or remixing a room does not complete the human challenge. These are separate rooms connected by extraction checkpoints, alongside the two walkable raised annexes within a room.
+The surrounding platforms now represent **eight playable sectors**, each with its own layout and objective: Arrival dock, Wormhole terminal, Aerial research wing, Cryogenic reactor, Mirage observatory, Chromatic vault, Skybridge complex, and Orbital command. Open **Explore levels** to choose a platform in the 3D sector map or its accessible card list. Escape a level yourself to unlock the next one; completion is saved on this browser/device. Watching the scout or remixing a room does not complete the human challenge. These are separate rooms connected by extraction checkpoints, alongside the two walkable raised annexes within a room.
 
 Multiplayer has two modes:
 
