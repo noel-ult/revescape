@@ -552,7 +552,10 @@ export class FacilityScene {
       for (let row = 0; row < 8; row++) for (let col = 0; col < 8; col++) {
         if (deckAt(this.topology, row, col) !== level) continue;
         const center = this.at(row, col);
-        if (Math.abs(point.x - center.x) < 0.5 && Math.abs(point.z - center.z) < 0.5)
+        // Half-open bounds assign shared grid seams to exactly one sector.
+        // Strict bounds on both sides left center clicks between four cells unpickable.
+        const dx = point.x - center.x, dz = point.z - center.z;
+        if (dx >= -0.5 && dx < 0.5 && dz >= -0.5 && dz < 0.5)
           return { row, col };
       }
     }
@@ -659,6 +662,7 @@ export class FacilityScene {
     this.renderer.domElement.dataset.ready = 'true';
     this.renderer.domElement.dataset.agentPosition = `${this.robot.position.x.toFixed(3)},${this.robot.position.z.toFixed(3)}`;
     this.renderer.domElement.dataset.agentLevel = `${this.props.currentStep?.level ?? 0}`;
+    this.renderer.domElement.dataset.agentHeight = this.robot.position.y.toFixed(3);
   };
 
   dispose() {

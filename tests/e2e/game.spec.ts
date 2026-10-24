@@ -1,4 +1,22 @@
 import { expect, test } from '@playwright/test';
+import { PerspectiveCamera, Vector3 } from 'three';
+import { SHOWCASE_FACILITY } from '../../src/shared/facility';
+
+// Project a visible sector into the Plan camera, then exercise the real pointer picker.
+async function clickSector(page: import('@playwright/test').Page, row: number, col: number, level = 0) {
+  const canvas = page.locator('canvas[data-ready="true"]');
+  const bounds = (await canvas.boundingBox())!;
+  const aspect = bounds.width / bounds.height;
+  const camera = new PerspectiveCamera(aspect < 1.25 ? 48 : 39, aspect, 0.1, 100);
+  camera.position.set(0, aspect < 1.1 ? 25 : 21, 0.01);
+  camera.lookAt(0, 0, 0);
+  camera.updateMatrixWorld();
+  const position = new Vector3(col - 3.5, 0, row - 3.5);
+  if (level === 1) position.add(new Vector3(3.4, 1.45, -1.6));
+  if (level === 2) position.add(new Vector3(-3.4, 2.65, 2.1));
+  position.project(camera);
+  await canvas.click({ position: { x: (position.x + 1) * bounds.width / 2, y: (1 - position.y) * bounds.height / 2 } });
+}
 
 test.describe('Reverse Escape — Humans vs AI E2E Verification', () => {
   test('3D studio: place a module, undo, restore, and follow a moving scout', async ({ page }) => {
@@ -79,6 +97,93 @@ test.describe('Reverse Escape — Humans vs AI E2E Verification', () => {
       .textContent();
     expect(Number(scoreText)).toBeGreaterThan(300);
   });
+
+  test('manual exploration blocks deck edges and uses both legal lift bridges', async ({ page }) => {
+    await page.goto('/');
+    await page.getByTestId('solo-challenge-btn').click();
+    await page.getByRole('button', { name: 'Explore yourself' }).click();
+    const dialog = page.getByRole('dialog');
+    const canvas = dialog.locator('canvas[data-ready="true"]');
+    await expect(canvas).toBeVisible();
+    const move = async (direction: string, moves: number, level: number, blocked = false) => {
+      // Human input intentionally has a 190ms repeat guard; hold each key past it.
+      await page.keyboard.press(direction, { delay: 210 });
+      await expect(dialog.getByText('Your Human Moves:').locator('..').locator('span').last()).toHaveText(String(moves));
+      await expect(canvas).toHaveAttribute('data-agent-level', String(level));
+      if (blocked) await expect(dialog.getByText(/Find its lift bridge/)).toBeVisible();
+    };
+    await move('ArrowRight', 1, 0);
+    await move('ArrowRight', 2, 0); // Portal lands beside, rather than on, deck 2.
+    await move('ArrowDown', 2, 0, true);
+    await move('ArrowRight', 3, 0);
+    await move('ArrowDown', 4, 0);
+    await move('ArrowLeft', 5, 2);
+    await move('ArrowLeft', 6, 2);
+    await move('ArrowUp', 6, 2, true);
+    await move('ArrowRight', 7, 2);
+    await move('ArrowRight', 8, 0);
+    await move('ArrowUp', 9, 0);
+    await move('ArrowRight', 10, 0);
+    await move('ArrowUp', 11, 0);
+    await move('ArrowUp', 12, 0);
+    await move('ArrowRight', 12, 0, true);
+    await move('ArrowUp', 13, 0);
+    await move('ArrowRight', 14, 1);
+    await move('ArrowUp', 14, 1, true);
+    await move('ArrowLeft', 15, 0);
+    await page.keyboard.press('Escape');
+    await expect(dialog).not.toBeVisible();
+  });
+
+  for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844 }]) {
+    test(`raised 3D placement and scout elevation at ${viewport.width}px`, async ({ page }) => {
+      await page.setViewportSize(viewport);
+      const errors: string[] = [];
+      page.on('pageerror', error => errors.push(error.message));
+      await page.goto('/');
+      await page.getByTestId('solo-challenge-btn').click();
+      const canvas = page.locator('canvas[data-ready="true"]');
+      await expect(canvas).toBeVisible();
+      await page.getByRole('button', { name: 'top camera' }).click();
+      await page.getByRole('button', { name: 'Components', exact: true }).click();
+      await page.getByTestId('tool-EMPTY').click();
+      await clickSector(page, 2, 5, 1); // Remove the raised red key by pointing at its hardware.
+      await expect(page.getByTestId('budget-indicator')).toHaveText('26/30');
+      await page.getByTestId('tool-KEY_RED').click();
+      await clickSector(page, 2, 5, 1); // Replace it on the raised empty surface.
+      await expect(page.getByTestId('budget-indicator')).toHaveText('28/30');
+      await page.getByTestId('tool-EMPTY').click();
+      await clickSector(page, 6, 2, 2);
+      await expect(page.getByTestId('budget-indicator')).toHaveText('26/30');
+      await page.getByTestId('tool-KEY_CYAN').click();
+      await clickSector(page, 6, 2, 2);
+      await expect(page.getByTestId('budget-indicator')).toHaveText('28/30');
+      await page.getByRole('button', { name: 'Save design' }).click();
+      const saved = await page.evaluate(() => localStorage.getItem('facility-design'));
+      // Verify edits changed the intended raised sectors, rather than hidden main-floor cells.
+      expect(JSON.parse(saved!)).toEqual(SHOWCASE_FACILITY);
+      await expect(page.getByTestId('validation-status-box')).toContainText('ROOM VALID & SOLVABLE');
+      // Observe every rendered frame inside the page. Driver round trips can miss a
+      // 480ms ascent on software WebGL, even though the robot animates correctly.
+      await canvas.evaluate(element => {
+        const observed = new Set<number>();
+        new MutationObserver(() => {
+          const level = Number(element.getAttribute('data-agent-level'));
+          const height = Number(element.getAttribute('data-agent-height'));
+          if ((level === 1 || level === 2) && height > 0.05 && height < (level === 1 ? 1.45 : 2.65) - 0.05) {
+            observed.add(level);
+            element.setAttribute('data-observed-lifts', [...observed].sort().join(','));
+          }
+        }).observe(element, { attributes: true, attributeFilter: ['data-agent-height'] });
+      });
+      await page.getByTestId('test-room-btn').click();
+      await page.getByRole('button', { name: 'follow camera' }).click();
+      await canvas.scrollIntoViewIfNeeded();
+      await expect(canvas).toHaveAttribute('data-observed-lifts', '1,2', { timeout: 28000 });
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+      expect(errors).toEqual([]);
+    });
+  }
 
   test('Online PvP Multiplayer: 2 players join via room code, build traps, watch AI Escape, and see winner + rematch', async ({
     browser,

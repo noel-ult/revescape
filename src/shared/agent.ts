@@ -48,9 +48,9 @@ interface AStarNode {
 
 /**
  * Component 3: A* Pathfinding over the AI's currently known map.
- * - Never traverses undiscovered cells (except when the target itself is an adjacent tile).
+ * - Never traverses undiscovered cells.
  * - Respects currently held keys (`keyMask`) and current switch state (`switchMask`).
- * - Applies high movement cost penalty (`+40`) to remembered active hazard tiles (`TRAP_RESET`)
+ * - Applies high movement cost penalty (`+45`) to remembered active reset/EMP hazard tiles
  *   so the AI automatically routes around known hazards whenever an alternative route exists,
  *   while still allowing traversal if it is the ONLY path.
  */
@@ -160,7 +160,7 @@ export function planRouteAStar(
 
 /**
  * Autonomous Planning AI Simulation Engine:
- * - Component 1: Partial Observability (Chebyshev / Manhattan vision radius + Beacon signal detection)
+ * - Component 1: Partial Observability (Manhattan vision radius + Beacon signal detection)
  * - Component 2: Frontier-Based Exploration (scores known accessible cells bordering unknown space)
  * - Component 3: A* Pathfinding over known map with inventory state
  * - Component 4: Memory-Based Planning (persists knownHazards & verifiedDecoys across attempts)
