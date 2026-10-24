@@ -65,6 +65,17 @@ describe('Luna Decisions objective policy', () => {
     expect(request.mock.calls[0][1]?.signal?.aborted).toBe(true);
   });
 
+  it('accepts a cold connection that takes longer than the former 1.2-second timeout', async () => {
+    const request = vi.fn<typeof fetch>().mockImplementation((_url, init) => new Promise((resolve, reject) => {
+      const timer = setTimeout(() => resolve(answer()), 1_600);
+      init?.signal?.addEventListener('abort', () => {
+        clearTimeout(timer); reject(new Error('aborted'));
+      }, { once: true });
+    }));
+    const policy = createLunaPolicy({ enabled: true, apiKey: 'test-secret', fetch: request });
+    expect(await policy(snapshot)).toEqual({ source: 'luna', candidateId: '1' });
+  });
+
   it('bounds per-session calls and honors the server quota', async () => {
     const request = vi.fn<typeof fetch>().mockImplementation(async () => answer());
     const policy = createLunaPolicy({ enabled: true, apiKey: 'test-secret', fetch: request, maxCalls: 1 });

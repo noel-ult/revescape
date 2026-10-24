@@ -25,7 +25,9 @@ export function createLunaPolicy(options: LunaOptions): ObjectivePolicy {
     if (remaining <= 0 || calls >= (options.maxCalls ?? 8)) return fallback('decision budget reached');
     if (options.allowCall && !options.allowCall()) return fallback('server decision limit reached');
     calls++;
-    const timeout = AbortSignal.timeout(Math.max(1, Math.min(options.timeoutMs ?? 1_200, remaining)));
+    // A cold connection from the deployed host measured ~2.4s. Keep a bounded
+    // per-call margin while preserving the overall eight-second session budget.
+    const timeout = AbortSignal.timeout(Math.max(1, Math.min(options.timeoutMs ?? 4_000, remaining)));
     const signal = options.signal ? AbortSignal.any([timeout, options.signal]) : timeout;
     try {
       const response = await request('https://api.openai.com/v1/decisions', {

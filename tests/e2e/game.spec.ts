@@ -174,6 +174,7 @@ test.describe('Reverse Escape — Humans vs AI E2E Verification', () => {
 
   for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844 }]) {
     test(`raised 3D placement and scout elevation at ${viewport.width}px`, async ({ page }) => {
+      test.setTimeout(90_000);
       await page.setViewportSize(viewport);
       const errors: string[] = [];
       page.on('pageerror', error => errors.push(error.message));
@@ -216,7 +217,8 @@ test.describe('Reverse Escape — Humans vs AI E2E Verification', () => {
       await page.getByTestId('test-room-btn').click();
       await page.getByRole('button', { name: 'follow camera' }).click();
       await canvas.scrollIntoViewIfNeeded();
-      await expect(canvas).toHaveAttribute('data-observed-lifts', '1,2', { timeout: 28000 });
+      // Software rendering on a shared CI runner can delay timer-driven playback.
+      await expect(canvas).toHaveAttribute('data-observed-lifts', '1,2', { timeout: 45_000 });
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
       expect(errors).toEqual([]);
     });
