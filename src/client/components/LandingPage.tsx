@@ -39,11 +39,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           <span className="home-event"><span />MAKE ROOM FOR PLAY · KOCHI 2026</span>
           <h1>REVERSE<br /><em>ESCAPE</em><span>MIND WARS</span></h1>
           <h2>You build the world.<br />The AI finds a way.</h2>
-          <p>Build a multi-level facility. Outsmart a searching AI. Or race a friend across eight orbital sectors.</p>
+          <p>Play solo through eight orbital sectors, building your own facility for the scout, or race a friend live.</p>
           <div className="home-hero-actions">
-            <button className="architect-btn architect-btn-primary" data-testid="sector-map-btn" onClick={onOpenSectors}><Compass size={18} />Explore levels <ArrowUpRight size={18} /></button>
+            <button className="architect-btn architect-btn-primary" data-testid="sector-map-btn" onClick={onOpenSectors}><Compass size={18} />Solo expedition <ArrowUpRight size={18} /></button>
             <button className="architect-btn" data-testid="solo-challenge-btn" onClick={onStartSolo}>Architect studio <ArrowRight size={17} /></button>
           </div>
+          <p className="solo-expedition-hint">8 single-player levels · escape each sector to unlock the next</p>
           <button className="facility-home-help" onClick={onOpenHelp}>New to Mind Wars? <span>See how it works ↗</span></button>
         </div>
         <div className="facility-home-scene">

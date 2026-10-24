@@ -29,7 +29,7 @@ export function SectorMap({ onExit, onOpenStudio }: { onExit: () => void; onOpen
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch { setMessage('Completed for this session. Browser storage is unavailable.'); }
   };
   return <div className="sector-page">
-    <div className="sector-page-heading"><div><span className="architect-eyebrow">Orbital expedition / {completed.length} of {SECTORS.length} complete</span><h1>Every platform is a destination.</h1><p>Escape a sector to unlock the next. Your completed levels stay on this device.</p></div><button className="architect-btn" onClick={onExit}><ArrowLeft size={15} />Home</button></div>
+    <div className="sector-page-heading"><div><span className="architect-eyebrow">Single-player campaign / {completed.length} of {SECTORS.length} complete</span><h1>Every platform is a destination.</h1><p>Play each level yourself. Reach extraction to unlock the next sector; your progress stays on this device.</p></div><button className="architect-btn" onClick={onExit}><ArrowLeft size={15} />Home</button></div>
     <div className="sector-layout">
       <section className="sector-map-scene" aria-label="Interactive orbital sector map">
         <PuzzleGrid grid={sector.grid} sectorMap selectedSectorId={sector.id} completedSectors={completed} onSectorSelect={select} />
@@ -41,7 +41,7 @@ export function SectorMap({ onExit, onOpenStudio }: { onExit: () => void; onOpen
         <div className="sector-detail-metrics"><span><small>BFS BASELINE</small>{metrics.optimal} moves</span><span><small>SCOUT EXPLORATION</small>{metrics.fog} moves</span></div>
         <button className="architect-btn architect-btn-primary" data-testid="enter-sector-btn" onClick={() => setPlaying(true)}>Enter level <ArrowRight size={16} /></button>
         <button className="architect-btn" onClick={() => onOpenStudio(selected)}>Remix in architect studio</button>
-        <p className="sector-detail-note">A* explores with limited knowledge. BFS validates the full room. Race through all eight with a friend using Live escape race on the home screen.</p>
+        <p className="sector-detail-note">This is a solo campaign: use the controls to escape each room yourself. The scout’s fog-of-war move count is your benchmark; full-map BFS shows the optimal route. For a co-op rivalry, start Live escape race from the home screen.</p>
         {completed.includes(sector.id) && <p className="sector-complete"><Check size={16} />Sector complete{selected < SECTORS.length - 1 ? ' · next platform unlocked' : ' · expedition complete'}</p>}
       </aside>
     </div>

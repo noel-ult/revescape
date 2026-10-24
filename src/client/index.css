@@ -394,6 +394,7 @@ h1, h2, h3 { text-wrap: balance; }
 .facility-home-copy h2 { font: 500 clamp(21px, 2vw, 27px)/1.35 'Space Grotesk', Inter, sans-serif; color: #c4d7e2; letter-spacing: -.4px; margin: 23px 0 14px; }
 .facility-home-copy > p { color: #8ea6ba; font-size: 14px; line-height: 1.8; max-width: 370px; margin-bottom: 25px; }
 .home-hero-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.facility-home-copy > .solo-expedition-hint { margin: 9px 0 0; color: #6f8c9f; font: 9px/1.6 'JetBrains Mono', monospace; letter-spacing: .55px; }
 .architect-btn { min-height: 36px; font-size: 11px; font-weight: 500; border-radius: 8px; border-color: #2b4257; background: #152639; color: #bed1df; transition: border-color 160ms, background 160ms, box-shadow 160ms, transform 160ms; }
 .architect-btn:hover:not(:disabled) { border-color: #52738c; background: #20384c; color: #effaff; transform: translateY(-1px); }
 .architect-btn-primary { background: #a7f2d6; color: #0b3029; border-color: #b1ffe3; box-shadow: 0 3px 17px #4ee7b215, inset 0 1px #e5fff499; font-weight: 700; }
