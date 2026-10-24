@@ -1,0 +1,253 @@
+import { Coordinate, TileMetadata, TileType } from './types';
+
+export const GRID_ROWS = 8;
+export const GRID_COLS = 8;
+export const MAX_BUDGET = 30;
+export const MAX_SOLVER_STATES = 8192;
+export const DEFAULT_VISION_RADIUS = 2;
+export const MAX_AGENT_STEPS = 180;
+
+export const START_POS: Coordinate = { row: 0, col: 0 };
+export const EXIT_POS: Coordinate = { row: 7, col: 7 };
+
+export const KEY_BITS: Partial<Record<TileType, number>> = {
+  KEY_RED: 1,   // bit 0
+  KEY_CYAN: 2,  // bit 1
+  KEY_GOLD: 4,  // bit 2
+};
+
+export const DOOR_KEY_BITS: Partial<Record<TileType, number>> = {
+  DOOR_RED: 1,
+  DOOR_CYAN: 2,
+  DOOR_GOLD: 4,
+};
+
+export const KEY_FOR_DOOR: Partial<Record<TileType, TileType>> = {
+  DOOR_RED: 'KEY_RED',
+  DOOR_CYAN: 'KEY_CYAN',
+  DOOR_GOLD: 'KEY_GOLD',
+};
+
+export const TILE_CATALOG: Record<TileType, TileMetadata> = {
+  EMPTY: {
+    type: 'EMPTY',
+    label: 'Floor Sector',
+    shortLabel: 'Eraser',
+    cost: 0,
+    maxCount: 64,
+    description: 'Clear cybernetic floor sector. Select or right-click to dismantle placed hardware.',
+    category: 'tool',
+    colorClass: 'border-slate-800/80 bg-[#0a1024]/80 text-slate-400',
+  },
+  START: {
+    type: 'START',
+    label: 'AI Drop Pod',
+    shortLabel: 'SPAWN',
+    cost: 0,
+    maxCount: 1,
+    description: 'Fixed infiltration drop-point at (0,0) where the Autonomous AI Agent deploys.',
+    category: 'anchor',
+    colorClass: 'border-cyan-400 bg-cyan-500/20 text-cyan-300',
+  },
+  EXIT: {
+    type: 'EXIT',
+    label: 'Extraction Core',
+    shortLabel: 'EXIT',
+    cost: 0,
+    maxCount: 1,
+    description: 'Fixed extraction core at (7,7). Every valid arena must maintain at least one solvable path here.',
+    category: 'anchor',
+    colorClass: 'border-emerald-400 bg-emerald-500/20 text-emerald-300',
+  },
+  WALL: {
+    type: 'WALL',
+    label: 'Plasma Barrier',
+    shortLabel: 'Plasma Wall',
+    cost: 1,
+    maxCount: 22,
+    description: 'High-energy laser emitter that links with adjacent emitters into continuous plasma walls.',
+    category: 'structure',
+    colorClass: 'border-cyan-500/50 bg-slate-900/95 text-cyan-200',
+  },
+  DECOY_EXIT: {
+    type: 'DECOY_EXIT',
+    label: 'Holo-Mirage Beacon',
+    shortLabel: 'Holo-Decoy',
+    cost: 3,
+    maxCount: 2,
+    description: 'Projects a counterfeit Extraction Core signal across the Fog of War, baiting the AI into dead-end ambushes!',
+    category: 'deception',
+    colorClass: 'border-pink-400 bg-pink-500/20 text-pink-200',
+  },
+  TRAP_RESET: {
+    type: 'TRAP_RESET',
+    label: 'Spring Ejector Mine',
+    shortLabel: 'Warp Mine',
+    cost: 3,
+    maxCount: 2,
+    description: 'Cloaked floor mine! Blasts the AI back to Spawn (0,0) on first contact. The AI learns its coordinates on Attempt 2!',
+    category: 'deception',
+    colorClass: 'border-orange-500 bg-orange-500/20 text-orange-200',
+  },
+  EMP_SCRAMBLER: {
+    type: 'EMP_SCRAMBLER',
+    label: 'EMP Radar Jammer',
+    shortLabel: 'EMP Jammer',
+    cost: 2,
+    maxCount: 2,
+    description: 'Detonates an electromagnetic pulse that blinds the AI lidar scanner (Vision Radius = 1) for 6 turns!',
+    category: 'tactical',
+    colorClass: 'border-yellow-400 bg-yellow-500/20 text-yellow-200',
+  },
+  PORTAL_A: {
+    type: 'PORTAL_A',
+    label: 'Quantum Wormhole',
+    shortLabel: 'Wormhole',
+    cost: 2,
+    maxCount: 2,
+    description: 'Place a pair of linked Quantum Wormholes to warp the AI instantaneously across the arena!',
+    category: 'tactical',
+    colorClass: 'border-indigo-400 bg-indigo-500/25 text-indigo-200',
+  },
+  GRAVITY_MUD: {
+    type: 'GRAVITY_MUD',
+    label: 'Cryo-Stasis Field',
+    shortLabel: 'Cryo-Sludge',
+    cost: 1,
+    maxCount: 6,
+    description: 'Heavy gravimetric field that triples movement energy cost (+2 extra steps), forcing A* to seek detours.',
+    category: 'tactical',
+    colorClass: 'border-sky-400 bg-sky-500/20 text-sky-200',
+  },
+  ELEVATOR_A: {
+    type: 'ELEVATOR_A',
+    label: 'Aerial Annex Lift',
+    shortLabel: 'Annex Lift',
+    cost: 1,
+    maxCount: 1,
+    description: 'Place beside the eastern annex (rows 1-2, cols 5-6) to open its raised walkable deck.',
+    category: 'structure',
+    colorClass: 'border-teal-400 bg-teal-900/70 text-teal-200',
+  },
+  ELEVATOR_B: {
+    type: 'ELEVATOR_B',
+    label: 'High Observatory Lift',
+    shortLabel: 'Sky Lift',
+    cost: 1,
+    maxCount: 1,
+    description: 'Place beside the western observatory (rows 5-6, cols 1-2) to open its high walkable deck.',
+    category: 'structure',
+    colorClass: 'border-amber-400 bg-amber-900/70 text-amber-200',
+  },
+  KEY_RED: {
+    type: 'KEY_RED',
+    label: 'Crimson Key',
+    shortLabel: 'Red Key',
+    cost: 2,
+    maxCount: 1,
+    description: 'Encrypted keycard collected on entry. Disables all Crimson Laser Bulkheads.',
+    category: 'key',
+    colorClass: 'border-rose-400 bg-rose-500/25 text-rose-300',
+  },
+  DOOR_RED: {
+    type: 'DOOR_RED',
+    label: 'Crimson Bulkhead',
+    shortLabel: 'Red Door',
+    cost: 2,
+    maxCount: 2,
+    description: 'Armored laser gate. Impassable until the AI locates and collects the Crimson Cipher.',
+    category: 'door',
+    colorClass: 'border-rose-500 bg-rose-950/80 text-rose-300',
+  },
+  KEY_CYAN: {
+    type: 'KEY_CYAN',
+    label: 'Cobalt Cipher',
+    shortLabel: 'Cyan Key',
+    cost: 2,
+    maxCount: 1,
+    description: 'Encrypted keycard collected on entry. Disables all Cobalt Laser Bulkheads.',
+    category: 'key',
+    colorClass: 'border-cyan-400 bg-cyan-500/25 text-cyan-200',
+  },
+  DOOR_CYAN: {
+    type: 'DOOR_CYAN',
+    label: 'Cobalt Bulkhead',
+    shortLabel: 'Cyan Door',
+    cost: 2,
+    maxCount: 2,
+    description: 'Armored laser gate. Impassable until the AI locates and collects the Cobalt Cipher.',
+    category: 'door',
+    colorClass: 'border-cyan-500 bg-cyan-950/80 text-cyan-300',
+  },
+  KEY_GOLD: {
+    type: 'KEY_GOLD',
+    label: 'Solar Cipher',
+    shortLabel: 'Gold Key',
+    cost: 2,
+    maxCount: 1,
+    description: 'Encrypted keycard collected on entry. Disables all Solar Laser Bulkheads.',
+    category: 'key',
+    colorClass: 'border-amber-400 bg-amber-500/25 text-amber-200',
+  },
+  DOOR_GOLD: {
+    type: 'DOOR_GOLD',
+    label: 'Solar Bulkhead',
+    shortLabel: 'Gold Door',
+    cost: 2,
+    maxCount: 2,
+    description: 'Armored laser gate. Impassable until the AI locates and collects the Solar Cipher.',
+    category: 'door',
+    colorClass: 'border-amber-500 bg-amber-950/80 text-amber-300',
+  },
+  SWITCH_A: {
+    type: 'SWITCH_A',
+    label: 'Phase Inverter Pad',
+    shortLabel: 'Phase Switch',
+    cost: 3,
+    maxCount: 2,
+    description: 'Toggles arena phase polarity (0 ↔ 1), simultaneously flipping all Closed and Open Phase Gates.',
+    category: 'switch',
+    colorClass: 'border-purple-400 bg-purple-500/25 text-purple-200',
+  },
+  GATE_A_CLOSED: {
+    type: 'GATE_A_CLOSED',
+    label: 'Phase Gate [LOCKED]',
+    shortLabel: 'Gate [-]',
+    cost: 2,
+    maxCount: 2,
+    description: 'Starts LOCKED. Opens only while Phase Inverter polarity is ON (1).',
+    category: 'gate',
+    colorClass: 'border-purple-500 bg-purple-950/85 text-purple-300',
+  },
+  GATE_A_OPEN: {
+    type: 'GATE_A_OPEN',
+    label: 'Phase Gate [ACTIVE]',
+    shortLabel: 'Gate [+]',
+    cost: 2,
+    maxCount: 1,
+    description: 'Starts OPEN. Slams shut when Phase Inverter polarity is toggled ON (1).',
+    category: 'gate',
+    colorClass: 'border-fuchsia-400 bg-fuchsia-950/60 text-fuchsia-300',
+  },
+};
+
+export const BUILDER_PALETTE_ORDER: TileType[] = [
+  'WALL',
+  'DECOY_EXIT',
+  'TRAP_RESET',
+  'EMP_SCRAMBLER',
+  'PORTAL_A',
+  'GRAVITY_MUD',
+  'ELEVATOR_A',
+  'ELEVATOR_B',
+  'KEY_RED',
+  'DOOR_RED',
+  'KEY_CYAN',
+  'DOOR_CYAN',
+  'KEY_GOLD',
+  'DOOR_GOLD',
+  'SWITCH_A',
+  'GATE_A_CLOSED',
+  'GATE_A_OPEN',
+  'EMPTY',
+];
