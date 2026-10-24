@@ -18,7 +18,7 @@ The wire format remains an 8×8 `Grid` of tile names. `getDeckTopology` derives 
 
 `canTraverseDeck` permits only cardinal neighbors, and a deck change must have its corresponding lift as an endpoint. BFS expansion, A* expansion, frontier adjacency, agent execution, and human movement all check this function. Portals and reset traps keep their explicit teleport semantics. A `level` on replay steps is derived from the final coordinate and topology, so no extra level dimension is required in BFS state keys or network grids.
 
-`facilityScene.ts` maps these sectors onto raised surfaces at heights 1.45 and 2.65, constructs a sloping bridge from each access cell to its legal annex neighbor, and interpolates the scout in all three axes. Pointer picking handles hardware and each active deck plane; half-open cell bounds assign exact grid seams to one sector. Ordinary towers outside the two annexes remain scenery. The blueprint fallback uses the same logical rules.
+`facilityScene.ts` maps these sectors onto raised surfaces at heights 1.45 and 2.65, constructs a sloping bridge from each access cell to its legal annex neighbor, and interpolates the scout in all three axes. Pointer picking handles hardware and each active deck plane; half-open cell bounds assign exact grid seams to one sector. The eight outer platforms are separate playable sector destinations, selected through the orbital map rather than adjacent cells within this room. The blueprint fallback uses the same logical rules.
 
 ## 1. Dual-Solver AI Architecture (`src/shared/agent.ts` & `src/shared/solver.ts`)
 

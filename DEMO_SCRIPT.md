@@ -36,7 +36,7 @@ Show the results and choose **Try escaping…** to enter the facility yourself w
 
 The demo requires no paid API or LLM service. If a device cannot render WebGL, the blueprint fallback keeps the game playable.
 
-If asked about scope: the annexes reuse eight sectors of the existing 8×8 grid; they are not arbitrary stacked floors. Their lift components activate the raised geometry and legal access. Other distant towers are decorative. Competitive simulation and scoring remain server-authoritative. Present the local or LAN session only; a GitHub source repository is not a public game deployment.
+If asked about scope: the annexes reuse eight sectors of the existing 8×8 grid; they are not arbitrary stacked floors. Their lift components activate the raised geometry and legal access. The eight distant platforms are separate playable levels selected through the orbital map, not extra cells in this room. Competitive simulation and scoring remain server-authoritative. Present the local or LAN session only; a GitHub source repository is not a public game deployment.
 
 
 ## Orbital levels and live human race variant
