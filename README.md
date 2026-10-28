@@ -150,3 +150,7 @@ Two players cooperate through three dedicated missions. Recovered access cores a
 ### Decision rewind
 
 In a solo AI arena, pause or scrub **Replay step**, inspect the scout’s knowledge, and replace one cell with a wall, clear floor, cryo field or EMP in **Decision rewind**. **Compare continuation** validates the edit and resumes from that state with the actual keys, polarity, discovered map, masked hazard beliefs, spent mines, portal usage and original replay prefix. Lift topology stays fixed during a rewind; redesign decks in the studio. Hidden edits are learned through observation. Continuations use deterministic frontier + A*, including when the retained prefix used Luna; no new model call is made. **Restore original replay** recovers the original trace. Submitted scores stay unchanged, and this editor is not available in competitive matches.
+
+<!-- developer-handbook-20261028 -->
+[Developer guide](docs/PROJECT_GUIDE.md) · [Source reference](docs/REFERENCE.md)
+<!-- /developer-handbook-20261028 -->
