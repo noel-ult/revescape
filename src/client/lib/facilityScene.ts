@@ -9,7 +9,7 @@ import type { PuzzleGridProps } from '../components/BlueprintGrid';
 export type CameraMode = 'orbit' | 'top' | 'follow';
 type Animated = { object: THREE.Object3D; kind: 'spin' | 'float' | 'door' | 'pulse'; base: number; phase: number };
 const PALETTES = {
-  ion: { accent: '#74eadb', wall: '#667f90', floor: '#273d49', backdrop: '#07131d', trim: '#b1d4da' },
+  ion: { accent: '#eab089', wall: '#8c8e99', floor: '#34353d', backdrop: '#15151b', trim: '#d3c9b9' },
   ember: { accent: '#ffb26b', wall: '#887368', floor: '#423736', backdrop: '#1b1214', trim: '#d8c3a5' },
   void: { accent: '#ba9dff', wall: '#79768f', floor: '#303346', backdrop: '#101021', trim: '#c2badd' },
 };

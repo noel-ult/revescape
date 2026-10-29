@@ -184,3 +184,7 @@ Completed online endless runs enter a server-verified results table ordered by f
 Local version 1 expedition saves migrate to version 2, preserving the completed Docking Ring and unlocking the remaining campaign. Legacy solo and architect saves remain separate. Local adventure and career progress stay on this device; export/import transfers adventure saves. Online state and verified results use `DATA_DIR/expeditions.sqlite` with WAL and atomic transactions; keep the entire data directory mounted persistently. Existing races and architect duels still live in memory.
 
 Use Node **22.13 or newer** (the production Dockerfile uses Node 22). `EXPEDITIONS_ENABLED=false` disables new online expedition creation/joining for rollout or rollback while existing game modes remain available. Keep one server replica. See [DEPLOYMENT.md](DEPLOYMENT.md) and [REVAMP_ROADMAP.md](REVAMP_ROADMAP.md).
+
+## Operations interface
+
+The interface has been replaced with a scene-led mission launcher, desktop navigation rail, mobile bottom navigation, charcoal/warm-white typography and orange action controls. Adventure uses a floating command HUD; the studio has a wide drafting surface with a right-hand construction tray. Lobbies, replay, results, challenges and portal dialogs share the new material system. The former landing/navigation markup, cyber-card styles and stacked legacy stylesheet have been removed. Game rules, saves and multiplayer protocols remain compatible.

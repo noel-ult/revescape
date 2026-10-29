@@ -190,7 +190,7 @@ export const ArenaScreen: React.FC<ArenaScreenProps> = ({
   return (
     <div className="game-screen arena-screen max-w-[1600px] mx-auto px-4 py-6">
       {/* Arena Header & Controls */}
-      <div className="cyber-card rounded-2xl p-4 sm:p-5 mb-5 flex flex-wrap items-center justify-between gap-4 border border-cyan-400/40">
+      <div className="interface-panel rounded-2xl p-4 sm:p-5 mb-5 flex flex-wrap items-center justify-between gap-4 border border-cyan-400/40">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-cyan-500/20 border border-cyan-400 flex items-center justify-center">
             <Bot className="w-6 h-6 text-cyan-300 animate-pulse" />
@@ -414,7 +414,7 @@ export const ArenaScreen: React.FC<ArenaScreenProps> = ({
           type="button"
           data-testid="view-results-btn"
           onClick={onFinishToResults}
-          className="px-5 py-2 rounded-xl bg-gradient-to-r from-cyan-400 to-emerald-400 hover:from-cyan-300 hover:to-emerald-300 text-slate-950 font-display font-bold text-xs flex items-center gap-1.5 shadow-neon-cyan"
+          className="architect-btn architect-btn-primary px-5 py-2 rounded-xl font-display font-bold text-xs flex items-center gap-1.5"
         >
           <Trophy className="w-4 h-4" />
           <span>
@@ -473,7 +473,7 @@ export const ArenaScreen: React.FC<ArenaScreenProps> = ({
             <div
               key={player.id}
               data-testid={`arena-player-card-${player.id}`}
-              className="cyber-card rounded-2xl p-5 flex flex-col border border-slate-700/80"
+              className="interface-panel rounded-2xl p-5 flex flex-col border border-slate-700/80"
             >
               {/* Player Header & Adaptation Comparison Pill */}
               <div className="w-full flex items-center justify-between mb-4 pb-3 border-b border-slate-800">

@@ -474,15 +474,17 @@ export const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="app-shell">
       <Navbar
+        active={view.startsWith('SOLO_')?'SOLO_BUILD':view==='PVP'?'ONLINE_EXPEDITION':view}
+        onNavigate={destination => {handleLeaveToHome(); if(destination==='SOLO_BUILD')handleStartSolo();else setView(destination as AppView);}}
         connected={connected}
         roomCode={view === 'PVP' ? matchState?.roomCode : undefined}
         onGoHome={handleLeaveToHome}
         onOpenHelp={() => setHelpOpen(true)}
       />
       {view === 'PVP' && !connected && <p className="connection-banner" role="status">Connection lost. Reconnecting to your multiplayer room…</p>}
-      <main className="flex-1">{renderContent()}</main>
+      <main className="app-content">{renderContent()}</main>
       <HowToPlayModal open={helpOpen} onClose={() => setHelpOpen(false)} />
     </div>
   );

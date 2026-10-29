@@ -18,3 +18,9 @@ describe('Expedition rewards and failure rules',()=>{
   s={...createAdventure('ENDLESS'),phase:'CHECKPOINT',integrity:2,upgrades:['cryo'],rewardChoices:['cryo']};s=chooseReward(s,'cryo');expect(s.integrity).toBe(3);expect(s.upgrades).toEqual(['cryo']);
  });
 });
+
+it('keeps a recovered console message readable while ASTRA follows',async()=>{
+ const {tickCompanion}=await import('../../src/shared/adventure');
+ let s=moveAdventure(createAdventure('CAMPAIGN'),0,0,1);s={...s,message:'Recovered station record. Read the crew instructions.'};
+ const next=tickCompanion(s);expect(next.players[1].col).toBe(1);expect(next.message).toBe(s.message);
+});

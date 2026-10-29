@@ -104,7 +104,9 @@ export function tickCompanion(state: AdventureState): AdventureState {
     }
     return state;
   }
-  return moveAdventure(state,1,...direction,adventureRoom(state),false);
+  const next=moveAdventure(state,1,...direction,adventureRoom(state),false);
+  // Routine companion steps must not erase a console record or the player's feedback.
+  return next.phase===state.phase&&['MOVE','CHANGE_LEVEL','GRAVITY_SLOW'].includes(next.players[1].lastStep.event)?{...next,message:state.message}:next;
 }
 export function advanceAdventure(state: AdventureState): AdventureState {
   if (state.phase !== 'CHECKPOINT' || state.rewardChoices.length) return state;

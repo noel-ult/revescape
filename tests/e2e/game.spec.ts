@@ -110,7 +110,7 @@ test.describe('Reverse Escape — Humans vs AI E2E Verification', () => {
   }) => {
     await page.goto('/');
 
-    await expect(page.locator('h1')).toContainText('REVERSE');
+    await expect(page.getByRole('heading', { name: 'Your next escape starts here.', exact: true })).toBeVisible();
     await page.getByTestId('solo-challenge-btn').click();
 
     // Load Key & Lock Gauntlet preset

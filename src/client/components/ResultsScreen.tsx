@@ -58,9 +58,9 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({
       {/* Winner Banner */}
       <div
         data-testid="results-banner"
-        className="cyber-card rounded-2xl p-6 sm:p-8 text-center border border-cyan-400/50 mb-8 relative overflow-hidden"
+        className="result-verdict"
       >
-        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 text-slate-950 flex items-center justify-center mx-auto mb-4 shadow-lg">
+        <div className="verdict-emblem">
           <Trophy className="w-8 h-8 stroke-[2.2]" />
         </div>
 
@@ -81,7 +81,7 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({
             : `${winnerPlayer?.name ?? 'ARCHITECT'} WINS!`}
         </h2>
 
-        <p className="mt-2 text-sm text-slate-300 max-w-xl mx-auto">
+        <p className="result-verdict-summary">
           {mode === 'SOLO'
             ? `The autonomous AI required ${
                 players[0]?.scoreBreakdown?.actualAgentSteps ?? 0
@@ -96,7 +96,7 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({
         </p>
 
         {/* Action Buttons */}
-        <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+        <div className="result-verdict-actions">
           <button
             type="button"
             data-testid="replay-arena-btn"
@@ -111,7 +111,7 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({
             type="button"
             data-testid="rematch-btn"
             onClick={onRematch}
-            className="px-6 py-3 rounded-xl bg-gradient-to-r from-cyan-400 to-purple-500 hover:from-cyan-300 hover:to-purple-400 text-slate-950 font-display font-bold text-xs sm:text-sm flex items-center gap-2 shadow-neon-cyan transition"
+            className="architect-btn architect-btn-primary px-6 py-3 rounded-xl font-display font-bold text-xs sm:text-sm flex items-center gap-2 transition"
           >
             <RefreshCw className="w-4 h-4" />
             <span>
@@ -149,8 +149,8 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({
               data-testid={`result-card-${p.id}`}
               className={`rounded-2xl p-6 border ${
                 isWinner
-                  ? 'cyber-card border-amber-400/70 shadow-[0_0_25px_rgba(245,158,11,0.2)]'
-                  : 'cyber-card border-slate-800'
+                  ? 'interface-panel border-amber-400/70 shadow-[0_0_25px_rgba(245,158,11,0.2)]'
+                  : 'interface-panel border-slate-800'
               }`}
             >
               <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-800">

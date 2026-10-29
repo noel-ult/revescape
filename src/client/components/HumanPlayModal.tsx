@@ -174,7 +174,7 @@ export const HumanPlayModal: React.FC<HumanPlayModalProps> = ({
 
   return createPortal(
     <div className="human-exploration-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
-      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={title} className={`cyber-card human-playable max-w-6xl w-full rounded-2xl p-6 border border-cyan-400/50 max-h-[92vh] overflow-y-auto ${expedition ? 'human-expedition' : ''} ${ghostRace ? 'human-ghost-race' : ''}`}>
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={title} className={`interface-panel human-playable max-w-6xl w-full rounded-2xl p-6 border border-cyan-400/50 max-h-[92vh] overflow-y-auto ${expedition ? 'human-expedition' : ''} ${ghostRace ? 'human-ghost-race' : ''}`}>
         <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-800">
           <div className="flex items-center gap-2.5">
             <Gamepad2 className="w-6 h-6 text-cyan-400" />
