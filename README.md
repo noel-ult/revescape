@@ -188,3 +188,7 @@ Use Node **22.13 or newer** (the production Dockerfile uses Node 22). `EXPEDITIO
 ## Operations interface
 
 The interface has been replaced with a scene-led mission launcher, desktop navigation rail, mobile bottom navigation, charcoal/warm-white typography and orange action controls. Adventure uses a floating command HUD; the studio has a wide drafting surface with a right-hand construction tray. Lobbies, replay, results, challenges and portal dialogs share the new material system. The former landing/navigation markup, cyber-card styles and stacked legacy stylesheet have been removed. Game rules, saves and multiplayer protocols remain compatible.
+
+<!-- developer-handbook-20261028 -->
+[Developer guide](docs/PROJECT_GUIDE.md) · [Source reference](docs/REFERENCE.md)
+<!-- /developer-handbook-20261028 -->
