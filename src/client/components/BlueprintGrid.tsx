@@ -33,6 +33,8 @@ export interface PuzzleGridProps {
   sectors?: readonly Sector[];
   initialCamera?: 'orbit' | 'top' | 'follow';
   followLabel?: string;
+  interactionHint?: string;
+  adventureMarkers?: Array<Coordinate & {label:string;color:string;links?:Coordinate[]}>;
   selectedSectorId?: string;
   completedSectors?: string[];
   onSectorSelect?: (id: string) => void;

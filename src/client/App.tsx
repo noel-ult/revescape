@@ -5,6 +5,8 @@ import { validateBoard } from '../shared/validator';
 import { runAutonomousAgentAsync } from '../shared/agent';
 import { SHOWCASE_FACILITY } from '../shared/facility';
 import { decodeFacility } from '../shared/challenges';
+import { OnlineExpeditionScreen } from './components/OnlineExpeditionScreen';
+import { AdventureScreen } from './components/AdventureScreen';
 import { DailyScreen } from './components/DailyScreen';
 import { SharedFacilityScreen } from './components/SharedFacilityScreen';
 import { SectorMap } from './components/SectorMap';
@@ -26,6 +28,9 @@ import {
 } from './lib/socket';
 
 type AppView =
+  | 'ONLINE_EXPEDITION'
+  | 'ADVENTURE'
+  | 'ENDLESS'
   | 'DAILY'
   | 'SHARED'
   | 'SECTORS'
@@ -42,7 +47,7 @@ export const App: React.FC = () => {
     if (!code || params.has('room')) return null;
     try { return { grid: decodeFacility(code) }; } catch (error) { return { error: (error as Error).message }; }
   });
-  const [view, setView] = useState<AppView>(sharedFacility ? 'SHARED' : 'LANDING');
+  const [view, setView] = useState<AppView>(new URLSearchParams(window.location.search).has('expedition') ? 'ONLINE_EXPEDITION' : sharedFacility ? 'SHARED' : 'LANDING');
   const [playerName, setPlayerName] = useState<string>(
     () => getSavedPlayerName() || 'Architect'
   );
@@ -75,7 +80,7 @@ export const App: React.FC = () => {
       // Check URL query param `?room=CODE` or saved session room
       const params = new URLSearchParams(window.location.search);
       const urlRoom = params.get('room');
-      if (params.has('blueprint') && !urlRoom) return;
+      if ((params.has('blueprint') || params.has('expedition')) && !urlRoom) return;
       const targetRoom = (urlRoom || getSavedRoomCode()).trim().toUpperCase();
 
       if (targetRoom) {
@@ -197,6 +202,7 @@ export const App: React.FC = () => {
   const handleLeaveToHome = () => {
     scoutRequest.current?.abort();
     getSocket().emit('lobby:leave');
+    getSocket().emit('expedition:leave', {version:1}, () => {});
     saveRoomCode('');
     setMatchState(null);
     setPvpReplayArena(false);
@@ -335,6 +341,8 @@ export const App: React.FC = () => {
   };
 
   const renderContent = () => {
+    if (view === 'ONLINE_EXPEDITION') return <OnlineExpeditionScreen onExit={handleLeaveToHome} />;
+    if (view === 'ADVENTURE' || view === 'ENDLESS') return <AdventureScreen key={view} mode={view === 'ENDLESS' ? 'ENDLESS' : 'CAMPAIGN'} onExit={handleLeaveToHome} />;
     if (view === 'DAILY') return <DailyScreen playerName={playerName} playerToken={playerToken} onChangeName={handleChangeName} onExit={handleLeaveToHome} />;
     if (view === 'SHARED' && sharedFacility) return <SharedFacilityScreen facility={sharedFacility} onExit={handleLeaveToHome} onRemix={grid => {
       setSoloGrid(cloneGrid(grid)); setView('SOLO_BUILD');
@@ -447,6 +455,9 @@ export const App: React.FC = () => {
 
     return (
       <LandingPage
+        onOpenOnlineExpedition={() => { handleLeaveToHome(); setView('ONLINE_EXPEDITION'); }}
+        onOpenAdventure={() => setView('ADVENTURE')}
+        onOpenEndless={() => setView('ENDLESS')}
         playerName={playerName}
         onChangePlayerName={handleChangeName}
         onCreateLobby={handleCreateLobby}

@@ -69,8 +69,8 @@ export default function FacilityView(props: PuzzleGridProps) {
           <div className="facility-agent-label"><Crosshair size={14} /><span>SCOUT 01</span><b>DECK {step?.level ?? 0} / {step ? step.event === 'EXIT' ? 'EXTRACTED' : 'EXPLORING' : 'STANDBY'}</b></div>
           <div className="facility-help">{camera === 'follow'
             ? 'Following Scout 01 · Walls cut away for visibility · Use Orbit or Plan to build'
-            : props.sectorMap ? 'Click a platform to choose its level · Drag to orbit' : props.interactive ? 'Click to build · Right-drag to orbit · Scroll to zoom · Two fingers on touch'
-            : 'Drag to orbit · Scroll to zoom · Follow AI for a close-up'}</div>
+            : props.sectorMap ? 'Click a platform to choose its level · Drag to orbit' : props.interactionHint ?? (props.interactive ? 'Click to build · Right-drag to orbit · Scroll to zoom · Two fingers on touch'
+            : 'Drag to orbit · Scroll to zoom · Follow AI for a close-up')}</div>
         </div>
       )}
     </div>

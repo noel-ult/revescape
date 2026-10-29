@@ -104,3 +104,13 @@ A Dockerfile application must mount a named volume at `/app/data`, matching `DAT
 The application mount has been configured in the current Dokploy project. After deploying, complete an actual daily run and verify its result is saved. Keep named volumes when replacing containers; include them in backups. The official [Dokploy storage documentation](https://docs.dokploy.com/docs/core/applications/advanced) describes named mounts.
 
 Daily scores are atomically stored in `daily-scores.json`; credentials are hashed, and only public callsigns, verified move counts and timestamps appear in rankings. Keep `data/` excluded from Git and Docker build contexts. A damaged existing file is not overwritten automatically. Disk/permission failures leave gameplay available and explicitly report the ranking as unsaved. Active daily runs and co-op/race rooms remain transient and must be restarted after deployment. Use one replica for both movement state and the local score file.
+
+## Persistent expedition sessions
+
+The full expedition release requires Node 22.13+; the root Dockerfile uses current Node 22. Mount the whole `/app/data` directory, not only a database file. `expeditions.sqlite`, its WAL/SHM files and the existing daily JSON rankings share `DATA_DIR`. SQLite commits accepted checkpoints and terminal results atomically. Back up with SQLite's online backup API or stop the service and copy the entire directory; do not copy only the live main file while WAL writes continue.
+
+Online expedition sessions can recover after an application restart by invite code plus the private original-tab credential. Sessions expire after seven days without updates. Results are persistent, anonymous and server-observed. Existing Architect Duel and race rooms are still process-local. Keep one replica; neither match manager supports multiple independent instances.
+
+`EXPEDITIONS_ENABLED=false` disables creation/joining of new online expeditions, leaving previous game modes available. Roll back using the previous application image if needed; retain the data volume. Schema creation is additive and does not rewrite legacy saves. A deployment with this flag disabled reports an owned error when opening online expedition setup.
+
+Verify production with `/api/health`, `npm run smoke -- https://your-domain`, a two-browser online expedition (including pause and reconnect), and a real SQLite checkpoint recovery after restarting the service. Do not infer container or public verification from local tests.

@@ -222,6 +222,7 @@ export class FacilityScene {
 
   private clear(group: THREE.Object3D) {
     group.traverse((object) => {
+      if (object instanceof THREE.Sprite) { const material=object.material as THREE.SpriteMaterial; material.map?.dispose();material.dispose(); }
       if (object instanceof THREE.Mesh || object instanceof THREE.Line) {
         object.geometry.dispose();
         if (object instanceof THREE.InstancedMesh) object.dispose();
@@ -291,7 +292,7 @@ export class FacilityScene {
     const sectors = this.props.sectors ?? SECTORS;
     sectors.forEach((sector, index) => {
       const group = new THREE.Group();
-      const [x, y, z] = sectorPosition(index);
+      const [x, y, z] = sectorPosition(index,sectors.length);
       group.position.set(x, y, z); group.userData.sectorId = sector.id;
       this.architecture.add(group); this.sectorPlatforms.push(group);
       const selected = sector.id === this.props.selectedSectorId;
@@ -318,7 +319,7 @@ export class FacilityScene {
       this.cylinder(group, 0.13, selected ? 1.5 : 0.65, selected ? 0.75 : 0.32, color, true).position.z = -1.5;
       if (selected) this.ring(group, 2.05, 0.035, color, 0.06);
       if (this.props.sectorMap && index > 0) {
-        const previous = new THREE.Vector3(...sectorPosition(index - 1));
+        const previous = new THREE.Vector3(...sectorPosition(index - 1,sectors.length));
         const next = new THREE.Vector3(x, y, z);
         this.architecture.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([previous, next]), new THREE.LineBasicMaterial({ color: '#527886', transparent: true, opacity: 0.5 })));
       }
@@ -463,6 +464,18 @@ export class FacilityScene {
 
   private buildOverlay() {
     this.clear(this.overlay);
+    for(const marker of this.props.adventureMarkers??[]) {
+      const position=this.at(marker.row,marker.col,0.15);
+      this.box(this.overlay,[0.72,0.035,0.72],[position.x,position.y,position.z],marker.color,true,0.45);
+      for(const link of marker.links??[]) {
+        const end=this.at(link.row,link.col,0.14);
+        const line=new THREE.Line(new THREE.BufferGeometry().setFromPoints([position,new THREE.Vector3(end.x,position.y,position.z),end]),new THREE.LineBasicMaterial({color:marker.color,transparent:true,opacity:0.65}));this.overlay.add(line);
+      }
+      const canvas=document.createElement('canvas');canvas.width=384;canvas.height=64;
+      const context=canvas.getContext('2d');if(!context)continue;
+      context.fillStyle='#07131de8';context.fillRect(0,0,384,64);context.fillStyle=marker.color;context.font='bold 24px sans-serif';context.textAlign='center';context.fillText(marker.label,192,41,370);
+      const texture=new THREE.CanvasTexture(canvas);const sprite=new THREE.Sprite(new THREE.SpriteMaterial({map:texture,depthTest:false,transparent:true}));sprite.position.copy(this.at(marker.row,marker.col,0.8));sprite.scale.set(1.65,0.28,1);sprite.renderOrder=10;this.overlay.add(sprite);
+    }
     const route = this.props.plannedRoute ?? [];
     const current = this.props.currentStep;
     const visited = this.props.visitedSteps ?? [];

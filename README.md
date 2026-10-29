@@ -150,3 +150,37 @@ Two players cooperate through three dedicated missions. Recovered access cores a
 ### Decision rewind
 
 In a solo AI arena, pause or scrub **Replay step**, inspect the scout’s knowledge, and replace one cell with a wall, clear floor, cryo field or EMP in **Decision rewind**. **Compare continuation** validates the edit and resumes from that state with the actual keys, polarity, discovered map, masked hazard beliefs, spent mines, portal usage and original replay prefix. Lift topology stays fixed during a rewind; redesign decks in the studio. Hidden edits are learned through observation. Continuations use deterministic frontier + A*, including when the retained prefix used Luna; no new model call is made. **Restore original replay** recovers the original trace. Submitted scores stay unchanged, and this editor is not available in competitive matches.
+
+## Expedition revamp
+
+The command deck offers **Continue adventure**, **Endless expedition**, and **Play online expedition**, alongside all previous modes.
+
+### Campaign: six sectors, 18 rooms
+
+Restore Docking Ring, Power Foundry, Cryo Research, Signal Archive, Sky Observatory and Command Nexus. Each sector has three connected rooms with its own layout and objectives. Later sectors combine powered relay circuits, occupied pressure pads, access cores, raised decks, pulse barriers, decoys and EMP. Restore all required relays before extraction. Every room requires both explorers to reach the exit.
+
+ASTRA follows commands: Follow, Hold, Interact, Regroup and Scout. Interact assigns a discovered tile and holds there; at a relay or terminal ASTRA operates the console. The companion chooses goals and uses A* through shared discoveries, respects deck boundaries, avoids known reset mines, and reports blocked tasks. Scouting chooses reachable frontiers with undiscovered neighbors. It uses deterministic planning and explicit memory, with no training or model API calls. The optional Luna studio mode remains separate.
+
+Use **Systems & discoveries** to operate a neighboring relay or recover a station log. Lines in the 3D scene connect relays to their gates; labels report power and pulse state. Pulses advance on successful human movement, machinery interaction or **Wait one beat**, so they are readable tactical hazards rather than reaction tests. EMP narrows sensors. Optional salvage and recovered logs persist in the career journal. Escalating hints reveal objectives, guidance, then suggested coordination.
+
+Each completed campaign room earns an extraction star, a par star when the combined explorer move count meets its par, and a clean-run star for avoiding reset mines. Best mastery persists across restarts. Amber and violet console cosmetics unlock after 3 and 9 mastered rooms; cosmetics do not change rules. Checkpoints unlock the next sector; orbital navigation previews the six actual destinations and lets you revisit unlocked sectors between rooms.
+
+### Endless runs
+
+Endless uses seeded, validated cooperative puzzle templates. Difficulty increases the template pool and bounded obstacle/hazard mutations. A mutation is accepted only if an authored sequence of cooperative dependencies can still be completed through legal move/wait/interaction searches. Generation has a bounded attempt budget and falls back to the validated original template. There is no guaranteed outer-corridor bypass.
+
+Three rooms form a floor. At floor checkpoints choose an upgrade, extract, or continue. Maintenance and Signal routes select different deterministic puzzle branches. Integrity begins at 3, repairs cap at 5, reset mines cost integrity, and zero ends the run. Shields absorb one loss; scanners reveal nearby cells once; cryo stabilizers shorten human coolant recovery; scout modules enable autonomous companion exploration. Duplicate installed modules convert to integrity repair. Seeds, branch choices, rewards, collected records and consumed upgrades survive resume; reloading cannot reroll them. Terminal runs are archived once in the career with best floor and run count.
+
+### Online adventure and endless
+
+Choose one human with ASTRA or two human explorers. Create a private expedition, share its invite, and ready the team. Both modes use the same adventure engine with the Node server owning movement, machinery, timers, upgrades, progression and completion. Two-human sessions pause progression while either player is disconnected. Either player can pause; the host selects destinations, checkpoint upgrades and extraction. Two humans control their own explorers and cannot issue ASTRA commands to one another.
+
+Socket messages are versioned and numbered per seat. Duplicate actions cannot apply twice; stale, malformed, unbound or forged actions are rejected. Reconnect credentials are hashed in storage and never broadcast. Refresh restores the seat and checkpoint; server restarts also recover from SQLite. Credentials live in the originating browser tab's session storage; invite codes alone cannot take an occupied seat. There are no authenticated accounts or automatic cross-device credential recovery.
+
+Completed online endless runs enter a server-verified results table ordered by floors, then moves. Callsigns are anonymous; this is not account authentication or sophisticated bot detection. Local imported saves never enter online sessions or verified results. Rematch requires both players' votes and opens a fresh expedition without overwriting the previous result.
+
+### Saves and deployment
+
+Local version 1 expedition saves migrate to version 2, preserving the completed Docking Ring and unlocking the remaining campaign. Legacy solo and architect saves remain separate. Local adventure and career progress stay on this device; export/import transfers adventure saves. Online state and verified results use `DATA_DIR/expeditions.sqlite` with WAL and atomic transactions; keep the entire data directory mounted persistently. Existing races and architect duels still live in memory.
+
+Use Node **22.13 or newer** (the production Dockerfile uses Node 22). `EXPEDITIONS_ENABLED=false` disables new online expedition creation/joining for rollout or rollback while existing game modes remain available. Keep one server replica. See [DEPLOYMENT.md](DEPLOYMENT.md) and [REVAMP_ROADMAP.md](REVAMP_ROADMAP.md).

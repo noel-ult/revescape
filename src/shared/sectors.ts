@@ -31,7 +31,7 @@ export const SECTORS: Sector[] = [
   { id: 'command', name: 'Orbital command', theme: 'ember', color: '#ffb66b', mechanic: 'Final expedition', objective: 'Escape the full multi-deck complex with portals, two access cores and an EMP field.', grid: finale },
 ];
 
-export function sectorPosition(index: number): [number, number, number] {
-  const angle = index / SECTORS.length * Math.PI * 2 - Math.PI / 2;
+export function sectorPosition(index: number, total = SECTORS.length): [number, number, number] {
+  const angle = index / total * Math.PI * 2 - Math.PI / 2;
   return [Math.cos(angle) * 12, 1 + index % 3 * 0.7, Math.sin(angle) * 12];
 }

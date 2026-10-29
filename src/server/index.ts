@@ -7,6 +7,7 @@ import { Server } from 'socket.io';
 import { validateBoard } from '../shared/validator';
 import { MatchManager } from './matchManager';
 import { createScoutRouter } from './scout';
+import { ExpeditionManager, ExpeditionStore } from './expeditions';
 import { createDailyRouter } from './daily';
 
 const PORT = Number(process.env.PORT || 3001);
@@ -50,7 +51,8 @@ const io = new Server(httpServer, {
   allowRequest: (req, done) => done(null, !origin || !req.headers.origin || req.headers.origin === origin),
 });
 const manager = new MatchManager(io);
-io.on('connection', socket => manager.registerSocket(socket));
+const expeditions = process.env.EXPEDITIONS_ENABLED === 'false' ? null : new ExpeditionManager(io, new ExpeditionStore(path.join(process.env.DATA_DIR || path.resolve('data'), 'expeditions.sqlite')));
+io.on('connection', socket => { manager.registerSocket(socket); if(expeditions)expeditions.register(socket);else for(const event of ['expedition:create','expedition:join','expedition:rankings'])socket.on(event,(_payload,ack)=>{if(typeof ack==='function')ack({ok:false,error:'Online expeditions are disabled on this server.'});}); });
 app.use('/assets', express.static(path.join(distDir, 'assets'), { immutable: true, maxAge: '1y' }));
 app.use(express.static(distDir, { maxAge: 0 }));
 app.get('*', (req, res) => {
@@ -64,7 +66,7 @@ app.use((error: { status?: number }, _req: express.Request, res: express.Respons
 httpServer.listen(PORT, '0.0.0.0', () => console.log(`[REVERSE ESCAPE] Listening on port ${PORT}`));
 function shutdown() {
   if (shuttingDown) return;
-  shuttingDown = true; manager.close();
+  shuttingDown = true; manager.close(); expeditions?.close();
   io.emit('server:restarting');
   io.close(() => httpServer.close(() => process.exit(0)));
   setTimeout(() => process.exit(0), 10_000).unref();

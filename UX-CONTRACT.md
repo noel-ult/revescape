@@ -28,3 +28,15 @@ Shared facilities are versioned public Grid snapshots. Full validation runs befo
 Co-op shares recovered keys, uses occupied pressure pads for gates, and requires both teammates at extraction. Individual traps, EMP and cooldowns are preserved. Only the bound player socket can move; disconnected teammates can reconnect, and one extracted player waits for the other. This mode uses three dedicated missions with the existing Grid and movement-intent format.
 
 The solo rewind editor owns a native component select and numeric row/column inputs with inline validation. It resumes from the paused replay state, preserves original knowledge/prefix, makes a deterministic continuation and offers original restoration. Competitive scoring and controls never accept a rewind edit.
+
+## Adventure behavior
+
+`AdventureScreen` owns local adventure sessions, with rules in shared `adventure.ts` and room data in `adventureContent.ts`. Companion commands use discovered cells and shared legal movement. Hold/Interact persist until a new command; regroup follows the player. Both explorers must extract. Keyboard movement pauses for guide overlays, editable inputs, pause, restart confirmation and import. Room transitions reset transient inventory and observations. Device saves are separate from all legacy progression; storage failures offer export. Import validates version, mode and state before replacing the session. Restart uses inline confirmation. Endless seeds and rewards persist so resuming cannot reroll them. No online ranking is claimed for these local runs.
+
+## Complete adventure and online protocol
+
+Circuit interaction requires proximity and legal deck access. Pulse barriers advance on actual human actions or Wait; indicators and 3D markers expose their state. Both explorers must extract; all required relays must be powered. Sector travel is allowed only between rooms, to unlocked destinations. Hints and recovered logs are journal content; cosmetic unlocks do not change competitive rules.
+
+Online expedition state is a controlled server snapshot. No imported save, client position, score or inventory is accepted. Per-seat sequences prevent duplicate effects, revisions prevent stale UI rollback, and only the bound socket can act. Team absence or pause blocks progression; the host alone chooses upgrades, branches, travel and extraction. Two humans cannot command one another as a bot. SQLite transactions preserve checkpoints/results across server restarts, while old race/duel rooms keep their prior memory lifecycle. Online credentials remain private and are stored in the originating tab; anonymous names are not authenticated accounts.
+
+Native form/select ownership applies to the online setup. Loading/pending/timeout/storage errors retain recovery actions. In-app confirmation protects local restart; online rematches require all votes and produce a fresh session. New sessions are saved before advertising success. Export/import is disabled for online state. Console accents and careers persist locally, independently of verified rankings.
